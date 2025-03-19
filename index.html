@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Snake Game</title>
+  <title>Snake Multiplayer</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
   <style>
     canvas {
@@ -14,7 +14,7 @@
     .controls {
       display: flex;
       justify-content: center;
-      margin-top: 20px;
+      margin-top: 10px;
     }
     .button {
       width: 80px;
@@ -23,7 +23,7 @@
       margin: 5px;
       text-align: center;
       line-height: 50px;
-      font-size: 20px;
+      font-size: 16px;
       cursor: pointer;
       border-radius: 10px;
     }
@@ -39,9 +39,9 @@
 
   <div id="playerInfo">Spieler: - | Punkte: 0</div>
 
-  <div class="controls" id="mobileControls" style="display: none;">
-    <div class="button" id="turnLeft">← Turn Left</div>
-    <div class="button" id="turnRight">→ Turn Right</div>
+  <div class="controls">
+    <div class="button" id="turnLeft">← Links</div>
+    <div class="button" id="turnRight">→ Rechts</div>
   </div>
 
   <script>
@@ -53,12 +53,10 @@
     const gridSize = 20;
     let snake, food, players = {};
 
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile) document.getElementById("mobileControls").style.display = "flex";
-
     socket.on("init", (data) => {
-      snake = data.snake;
+      players = data.players;
       food = data.food;
+      snake = players[socket.id] || null;
       updatePlayerInfo();
       drawGame();
     });
@@ -66,7 +64,7 @@
     socket.on("gameUpdate", (data) => {
       players = data.players;
       food = data.food;
-      snake = players[socket.id] || snake;
+      snake = players[socket.id] || null;
       updatePlayerInfo();
       drawGame();
     });
@@ -89,12 +87,6 @@
       if (snake) {
         playerInfo.innerText = `Spieler: ${snake.name} | Punkte: ${snake.score}`;
       }
-    }
-
-    if (!isMobile) {
-      window.addEventListener("keydown", (e) => {
-        socket.emit("keyPress", e.key);
-      });
     }
 
     document.getElementById("turnLeft").addEventListener("click", () => socket.emit("keyPress", "ArrowLeft"));
