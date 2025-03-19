@@ -4,10 +4,148 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Snake Game</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f0f0f0;
+    }
+    canvas {
+      border: 1px solid black;
+    }
+  </style>
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
-  <script src="/socket.io/socket.io.js"></script> <!-- Socket.IO-Client -->
-  <script src="game.js"></script> <!-- Dein Spiel-Logik-Skript -->
+
+  <!-- Socket.IO Client -->
+  <script src="https://snake-backend.onrender.com/socket.io/socket.io.js"></script> <!-- Dein Backend-Server -->
+  <script>
+    const socket = io("https://snake-backend.onrender.com"); // Verbindung zum Backend
+
+    let canvas = document.getElementById("gameCanvas");
+    let ctx = canvas.getContext("2d");
+
+    // Spielvariablen
+    let snake = [];
+    let food = {};
+    let gameOver = false;
+
+    // Spielgröße und Schlangeneinstellungen
+    const scale = 20;
+    const rows = 20;
+    const columns = 20;
+
+    canvas.width = columns * scale;
+    canvas.height = rows * scale;
+
+    // Spiel-Logik
+    const initGame = () => {
+      snake = [
+        { x: 5, y: 5 },
+        { x: 5, y: 4 },
+        { x: 5, y: 3 }
+      ];
+
+      food = generateFood();
+      gameOver = false;
+    };
+
+    const generateFood = () => {
+      const x = Math.floor(Math.random() * rows);
+      const y = Math.floor(Math.random() * columns);
+      return { x, y };
+    };
+
+    const drawGame = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Schlange zeichnen
+      for (let i = 0; i < snake.length; i++) {
+        ctx.fillStyle = i === 0 ? "green" : "white";
+        ctx.fillRect(snake[i].x * scale, snake[i].y * scale, scale, scale);
+        ctx.strokeStyle = "black";
+        ctx.strokeRect(snake[i].x * scale, snake[i].y * scale, scale, scale);
+      }
+
+      // Nahrung zeichnen
+      ctx.fillStyle = "red";
+      ctx.fillRect(food.x * scale, food.y * scale, scale, scale);
+    };
+
+    const updateGame = () => {
+      if (gameOver) return;
+
+      // Neue Position der Schlange
+      let head = { ...snake[0] };
+
+      // Bewegungslogik
+      if (keyPress === "ArrowUp") head.y--;
+      if (keyPress === "ArrowDown") head.y++;
+      if (keyPress === "ArrowLeft") head.x--;
+      if (keyPress === "ArrowRight") head.x++;
+
+      // Kollision mit sich selbst oder mit den Wänden
+      if (
+        head.x < 0 ||
+        head.x >= rows ||
+        head.y < 0 ||
+        head.y >= columns ||
+        snake.some(segment => segment.x === head.x && segment.y === head.y)
+      ) {
+        gameOver = true;
+        socket.emit("gameOver", { winner: "Blue" });
+        return;
+      }
+
+      snake.unshift(head);
+
+      // Kollision mit Nahrung
+      if (head.x === food.x && head.y === food.y) {
+        food = generateFood(); // Neue Nahrung erzeugen
+      } else {
+        snake.pop(); // Das letzte Segment entfernen
+      }
+
+      drawGame();
+    };
+
+    // Steuerung des Spiels über Pfeiltasten
+    let keyPress = null;
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowUp" && keyPress !== "ArrowDown") keyPress = "ArrowUp";
+      if (e.key === "ArrowDown" && keyPress !== "ArrowUp") keyPress = "ArrowDown";
+      if (e.key === "ArrowLeft" && keyPress !== "ArrowRight") keyPress = "ArrowLeft";
+      if (e.key === "ArrowRight" && keyPress !== "ArrowLeft") keyPress = "ArrowRight";
+    });
+
+    // Verbindung mit dem Server
+    socket.on("init", (data) => {
+      initGame();
+      drawGame();
+    });
+
+    // Game Update vom Backend erhalten
+    socket.on("gameUpdate", (data) => {
+      snake = data.snake;
+      food = data.food;
+      drawGame();
+    });
+
+    // Spiel starten
+    const gameLoop = () => {
+      if (!gameOver) {
+        updateGame();
+      }
+      setTimeout(gameLoop, 100);
+    };
+
+    gameLoop();
+
+  </script>
 </body>
 </html>
