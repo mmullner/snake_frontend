@@ -33,14 +33,18 @@
       margin-top: 10px;
     }
     #countdown {
-      font-size: 80px;
+      font-size: 120px; /* Countdown Schriftgröße auf 120px setzen */
       color: red;
       text-align: center;
       margin-top: 20px;
       position: absolute;
-      top: 40%;
+      top: 50%; /* Position mittig */
       left: 50%;
-      transform: translateX(-50%);
+      transform: translate(-50%, -50%); /* Absolut mittig positionieren */
+      display: none;
+    }
+    /* Verstecke die anderen Elemente während des Countdowns */
+    .hidden {
       display: none;
     }
   </style>
@@ -95,7 +99,7 @@
       countdownElement.style.display = "block";
       countdownElement.innerText = countdown;
 
-      // Countdown zurücksetzen und nach 3 Sekunden ausblenden
+      // Alle anderen Elemente ausblenden, solange der Countdown läuft
       if (countdown === 0) {
         setTimeout(() => {
           countdownElement.style.display = "none";
@@ -104,6 +108,9 @@
         }, 1000); // Nach einer Sekunde das Spielfeld wieder anzeigen
       } else {
         isInCountdown = true; // Countdown läuft, Spielfeld wird nicht angezeigt
+        document.getElementById("gameCanvas").classList.add("hidden"); // Canvas verstecken
+        document.getElementById("playerInfo").classList.add("hidden"); // Spielerinfos verstecken
+        document.getElementById("mobileControls").classList.add("hidden"); // Steuerung verstecken
       }
     });
 
@@ -124,6 +131,11 @@
 
       document.getElementById("playerInfo").innerText =
         `Spieler: ${players[playerId]?.name} | Score: ${players[playerId]?.score}`;
+
+      // Zeige das Spielfeld und die Steuerung nach dem Countdown wieder an
+      document.getElementById("gameCanvas").classList.remove("hidden");
+      document.getElementById("playerInfo").classList.remove("hidden");
+      document.getElementById("mobileControls").classList.remove("hidden");
     }
 
     // Tastatursteuerung
