@@ -1,98 +1,59 @@
 // Setup the game canvas
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
+canvas.width = 500;
+canvas.height = 500;
 
-// Socket.IO connection
-const socket = io('https://snake1-kgp4.onrender.com');  // Replace with your backend URL
+// Connect to the backend via Socket.IO
+const socket = io('https://snake1-kgp4.onrender.com:3000');  // Ersetze dies mit deiner Server-URL, wenn es auf Render.com läuft
 
 // Snake Game Variables
-let snake = [{ x: canvas.width / 2, y: canvas.height / 2 }];
+let players = {};
 let food = {};
-let direction = 'RIGHT';
-let score = 0;
 
-// Listen for keyboard events to control the snake
-document.addEventListener('keydown', (event) => {
-  if (event.key === 'ArrowUp' && direction !== 'DOWN') direction = 'UP';
-  if (event.key === 'ArrowDown' && direction !== 'UP') direction = 'DOWN';
-  if (event.key === 'ArrowLeft' && direction !== 'RIGHT') direction = 'LEFT';
-  if (event.key === 'ArrowRight' && direction !== 'LEFT') direction = 'RIGHT';
+// Listen for game state updates from the backend
+socket.on('init', (data) => {
+  players[socket.id] = data.snake;
+  food = data.food;
 });
 
-// Main game loop
-function gameLoop() {
-  updateGame();
+socket.on('newPlayer', (data) => {
+  players[data.id] = data.snake;
+});
+
+socket.on('gameUpdate', (gameState) => {
+  players = gameState.players;
+  food = gameState.food;
   drawGame();
-}
+});
 
-// Update the game state
-function updateGame() {
-  // Move the snake
-  const head = { ...snake[0] };
-  if (direction === 'UP') head.y -= 10;
-  if (direction === 'DOWN') head.y += 10;
-  if (direction === 'LEFT') head.x -= 10;
-  if (direction === 'RIGHT') head.x += 10;
+socket.on('gameOver', (data) => {
+  alert(`${data.winner} wins!`);
+  console.log('Scores:', data.scores);
+});
 
-  // Collision with walls (if snake goes out of bounds)
-  if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) {
-    resetGame();
-  }
+// Listen for key events to control the snake
+document.addEventListener('keydown', (event) => {
+  if (event.key === "ArrowUp") socket.emit('keyPress', 'ArrowUp');
+  if (event.key === "ArrowDown") socket.emit('keyPress', 'ArrowDown');
+  if (event.key === "ArrowLeft") socket.emit('keyPress', 'ArrowLeft');
+  if (event.key === "ArrowRight") socket.emit('keyPress', 'ArrowRight');
+});
 
-  // Collision with itself
-  if (snake.some((segment) => segment.x === head.x && segment.y === head.y)) {
-    resetGame();
-  }
-
-  // Add new head to snake
-  snake.unshift(head);
-
-  // Check for food collision
-  if (head.x === food.x && head.y === food.y) {
-    score += 10;
-    spawnFood();
-  } else {
-    snake.pop(); // Remove the tail if no food eaten
-  }
-}
-
-// Draw the game state
+// Function to draw the game state
 function drawGame() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Draw snake
-  snake.forEach((segment, index) => {
-    ctx.fillStyle = index === 0 ? 'green' : 'lime';
-    ctx.fillRect(segment.x, segment.y, 10, 10);
-  });
-
   // Draw food
-  ctx.fillStyle = 'red';
-  ctx.fillRect(food.x, food.y, 10, 10);
+  ctx.fillStyle = "red";
+  ctx.fillRect(food.x * 20, food.y * 20, 20, 20);
 
-  // Draw score
-  ctx.fillStyle = 'white';
-  ctx.font = '20px Arial';
-  ctx.fillText(`Score: ${score}`, 10, 30);
+  // Draw players' snakes
+  for (const playerId in players) {
+    const snake = players[playerId];
+    snake.body.forEach((segment, index) => {
+      ctx.fillStyle = index === 0 ? 'green' : 'lime';  // Head is green, body is lime
+      ctx.fillRect(segment[0] * 20, segment[1] * 20, 20, 20);
+    });
+  }
 }
-
-// Spawn food at random position
-function spawnFood() {
-  food = {
-    x: Math.floor(Math.random() * (canvas.width / 10)) * 10,
-    y: Math.floor(Math.random() * (canvas.height / 10)) * 10,
-  };
-}
-
-// Reset the game
-function resetGame() {
-  snake = [{ x: canvas.width / 2, y: canvas.height / 2 }];
-  direction = 'RIGHT';
-  score = 0;
-  spawnFood();
-}
-
-// Call gameLoop every 100ms
-setInterval(gameLoop, 100);
