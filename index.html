@@ -72,9 +72,9 @@
       ctx.fillRect(food.x * gridSize, food.y * gridSize, scale, scale);
 
       // Zeichne Snake
-      ctx.fillStyle = "blue";
-      snake.body.forEach(segment => {
-        ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
+	ctx.fillStyle = snake.color;  // Verwende die zufällige Farbe des Spielers
+  	snake.body.forEach(segment => {
+    ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
       });
     }
 
