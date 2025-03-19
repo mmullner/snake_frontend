@@ -26,29 +26,46 @@
 
     let snake, food;
 
+    // Initialisiere das Spiel, wenn die "init"-Nachricht vom Server kommt
     socket.on("init", (data) => {
       snake = data.snake;
       food = data.food;
-      drawGame();
+
+      if (snake && food) {
+        drawGame();
+      }
     });
 
+    // Aktualisiere das Spiel, wenn "gameUpdate"-Nachricht vom Server kommt
     socket.on("gameUpdate", (data) => {
-      snake = data.players[Object.keys(data.players)[0]];  // Hol dir den ersten Spieler
-      food = data.food;
-      drawGame();
+      if (data && data.players) {
+        snake = data.players[Object.keys(data.players)[0]];  // Hol dir den ersten Spieler
+        food = data.food;
+
+        if (snake && food) {
+          drawGame();
+        }
+      }
     });
 
+    // Wenn das Spiel vorbei ist
     socket.on("gameOver", (data) => {
-      alert(`${data.winner} wins!`);
+      if (data && data.winner) {
+        alert(`${data.winner} wins!`);
+      } else {
+        alert("Game Over!");
+      }
     });
 
     socket.on("newPlayer", (data) => {
-      // Handle new player logic if necessary
+      // Logik für neue Spieler (falls notwendig)
     });
 
-    // Zeichnen des Spiels
+    // Zeichne das Spiel
     function drawGame() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!snake || !snake.body || !food) return;  // Verhindert Fehler, wenn `snake.body` oder `food` nicht existieren
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);  // Löscht den Canvas
 
       // Zeichne Food
       ctx.fillStyle = "green";
@@ -61,9 +78,19 @@
       });
     }
 
-    // Tastenanschläge für Steuerung
+    // Tastenanschläge für Steuerung der Schlange
     window.addEventListener("keydown", (e) => {
-      socket.emit("keyPress", e.key);
+      const keyMap = {
+        "ArrowUp": "ArrowUp",
+        "ArrowDown": "ArrowDown",
+        "ArrowLeft": "ArrowLeft",
+        "ArrowRight": "ArrowRight"
+      };
+
+      // Überprüfe, ob die gedrückte Taste eine der erlaubten Tasten ist
+      if (keyMap[e.key]) {
+        socket.emit("keyPress", e.key);  // Sende die Tastenanschläge an den Server
+      }
     });
   </script>
 </body>
