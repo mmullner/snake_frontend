@@ -11,10 +11,36 @@
       display: block;
       margin: 20px auto;
     }
+    /* Optionale Buttons für mobile Steuerung */
+    .controls {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .button {
+      width: 50px;
+      height: 50px;
+      background-color: lightgray;
+      margin: 5px;
+      text-align: center;
+      line-height: 50px;
+      font-size: 20px;
+      cursor: pointer;
+      border-radius: 50%;
+    }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+  <!-- Buttons für mobile Steuerung -->
+  <div class="controls" id="mobileControls" style="display: none;">
+    <div class="button" id="up">↑</div>
+    <div class="button" id="left">←</div>
+    <div class="button" id="right">→</div>
+    <div class="button" id="down">↓</div>
+  </div>
+
   <script>
     const socket = io("https://snake1-kgp4.onrender.com");  // Backend-URL
 
@@ -26,71 +52,108 @@
 
     let snake, food;
 
-    // Initialisiere das Spiel, wenn die "init"-Nachricht vom Server kommt
+    // Gerät erkennen (mobile Geräte oder Computer)
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    if (isMobile) {
+      document.getElementById("mobileControls").style.display = "flex"; // Zeige die mobilen Steuerbuttons
+    }
+
     socket.on("init", (data) => {
       snake = data.snake;
       food = data.food;
-
-      if (snake && food) {
-        drawGame();
-      }
+      drawGame();
     });
 
-    // Aktualisiere das Spiel, wenn "gameUpdate"-Nachricht vom Server kommt
     socket.on("gameUpdate", (data) => {
-      if (data && data.players) {
-        snake = data.players[Object.keys(data.players)[0]];  // Hol dir den ersten Spieler
-        food = data.food;
-
-        if (snake && food) {
-          drawGame();
-        }
-      }
+      snake = data.players[Object.keys(data.players)[0]];  // Hol dir den ersten Spieler
+      food = data.food;
+      drawGame();
     });
 
-    // Wenn das Spiel vorbei ist
     socket.on("gameOver", (data) => {
-      if (data && data.winner) {
-        alert(`${data.winner} wins!`);
-      } else {
-        alert("Game Over!");
-      }
+      alert(`${data.winner} wins!`);
     });
 
     socket.on("newPlayer", (data) => {
-      // Logik für neue Spieler (falls notwendig)
+      // Handle new player logic if necessary
     });
 
-    // Zeichne das Spiel
+    // Zeichnen des Spiels
     function drawGame() {
-      if (!snake || !snake.body || !food) return;  // Verhindert Fehler, wenn `snake.body` oder `food` nicht existieren
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);  // Löscht den Canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       // Zeichne Food
       ctx.fillStyle = "green";
       ctx.fillRect(food.x * gridSize, food.y * gridSize, scale, scale);
 
       // Zeichne Snake
-	ctx.fillStyle = snake.color;  // Verwende die zufällige Farbe des Spielers
-  	snake.body.forEach(segment => {
-    ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
+      ctx.fillStyle = snake.color;  // Verwende die zufällige Farbe des Spielers
+      snake.body.forEach(segment => {
+        ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
       });
     }
 
-    // Tastenanschläge für Steuerung der Schlange
-    window.addEventListener("keydown", (e) => {
-      const keyMap = {
-        "ArrowUp": "ArrowUp",
-        "ArrowDown": "ArrowDown",
-        "ArrowLeft": "ArrowLeft",
-        "ArrowRight": "ArrowRight"
-      };
+    // Tastenanschläge für Steuerung (Desktop)
+    if (!isMobile) {
+      window.addEventListener("keydown", (e) => {
+        socket.emit("keyPress", e.key);
+      });
+    }
 
-      // Überprüfe, ob die gedrückte Taste eine der erlaubten Tasten ist
-      if (keyMap[e.key]) {
-        socket.emit("keyPress", e.key);  // Sende die Tastenanschläge an den Server
+    // Touch-Steuerung für Mobilgeräte
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    // Funktion, um die Richtung basierend auf der Wischbewegung zu ändern
+    function handleTouchStart(event) {
+      const touch = event.touches[0];
+      touchStartX = touch.pageX;
+      touchStartY = touch.pageY;
+    }
+
+    function handleTouchMove(event) {
+      const touch = event.touches[0];
+      const diffX = touch.pageX - touchStartX;
+      const diffY = touch.pageY - touchStartY;
+
+      if (Math.abs(diffX) > Math.abs(diffY)) {
+        // Horizontal wischen
+        if (diffX > 0) {
+          socket.emit("keyPress", "ArrowRight");  // nach rechts
+        } else {
+          socket.emit("keyPress", "ArrowLeft");  // nach links
+        }
+      } else {
+        // Vertikal wischen
+        if (diffY > 0) {
+          socket.emit("keyPress", "ArrowDown");  // nach unten
+        } else {
+          socket.emit("keyPress", "ArrowUp");  // nach oben
+        }
       }
+      touchStartX = touch.pageX;
+      touchStartY = touch.pageY;
+    }
+
+    // Event-Listener für Touch-Events (nur wenn es sich um ein mobiles Gerät handelt)
+    if (isMobile) {
+      canvas.addEventListener("touchstart", handleTouchStart);
+      canvas.addEventListener("touchmove", handleTouchMove);
+    }
+
+    // Mobile Button-Steuerung (alternativ)
+    document.getElementById("up").addEventListener("click", () => {
+      socket.emit("keyPress", "ArrowUp");
+    });
+    document.getElementById("down").addEventListener("click", () => {
+      socket.emit("keyPress", "ArrowDown");
+    });
+    document.getElementById("left").addEventListener("click", () => {
+      socket.emit("keyPress", "ArrowLeft");
+    });
+    document.getElementById("right").addEventListener("click", () => {
+      socket.emit("keyPress", "ArrowRight");
     });
   </script>
 </body>
