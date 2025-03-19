@@ -3,22 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Multiplayer Snake Game</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background-color: #000;
-    }
-    canvas {
-      display: block;
-      margin: auto;
-    }
-  </style>
+  <title>Snake Game</title>
 </head>
 <body>
   <canvas id="gameCanvas"></canvas>
-  <script src="https://cdn.socket.io/4.1.2/socket.io.min.js"></script>
-  <script src="game.js"></script>
+  <script src="/socket.io/socket.io.js"></script> <!-- Socket.IO-Client -->
+  <script src="game.js"></script> <!-- Dein Spiel-Logik-Skript -->
 </body>
 </html>
