@@ -11,14 +11,13 @@
       display: block;
       margin: 20px auto;
     }
-    /* Optionale Buttons für mobile Steuerung */
     .controls {
       display: flex;
       justify-content: center;
       margin-top: 20px;
     }
     .button {
-      width: 50px;
+      width: 80px;
       height: 50px;
       background-color: lightgray;
       margin: 5px;
@@ -26,94 +25,80 @@
       line-height: 50px;
       font-size: 20px;
       cursor: pointer;
-      border-radius: 50%;
+      border-radius: 10px;
+    }
+    #playerInfo {
+      text-align: center;
+      font-size: 18px;
+      margin-top: 10px;
     }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas" width="400" height="400"></canvas>
 
-  <!-- Buttons für mobile Steuerung: Nur "Turn Left" und "Turn Right" -->
+  <div id="playerInfo">Spieler: - | Punkte: 0</div>
+
   <div class="controls" id="mobileControls" style="display: none;">
-    <div class="button" id="left">←</div>
-    <div class="button" id="right">→</div>
+    <div class="button" id="turnLeft">← Turn Left</div>
+    <div class="button" id="turnRight">→ Turn Right</div>
   </div>
 
   <script>
     const socket = io("https://snake1-kgp4.onrender.com");
-
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
+    const playerInfo = document.getElementById("playerInfo");
 
     const gridSize = 20;
-    const scale = 20;
-
-    let snakes = {};  // Alle Schlangen werden hier gespeichert
-    let food;
+    let snake, food, players = {};
 
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    if (isMobile) {
-      document.getElementById("mobileControls").style.display = "flex"; // Zeige die mobilen Steuerbuttons
-    }
+    if (isMobile) document.getElementById("mobileControls").style.display = "flex";
 
     socket.on("init", (data) => {
-      snakes = data.players;  // Alle Spieler erhalten
+      snake = data.snake;
       food = data.food;
+      updatePlayerInfo();
       drawGame();
     });
 
     socket.on("gameUpdate", (data) => {
-      snakes = data.players;  // Alle Schlangenstatus updaten
+      players = data.players;
       food = data.food;
+      snake = players[socket.id] || snake;
+      updatePlayerInfo();
       drawGame();
     });
 
-    socket.on("newPlayer", (data) => {
-      // Hier kannst du Logik für neue Spieler hinzufügen, wenn nötig
-      console.log(`Neuer Spieler: ${data.id}`);
-    });
-
-    socket.on("playerLeft", (data) => {
-      // Spieler, der das Spiel verlässt, entfernen
-      delete snakes[data.id];
-      drawGame();  // Spiel neu zeichnen
-    });
-
-    // Zeichnen des Spiels
     function drawGame() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Zeichne Food
       ctx.fillStyle = "green";
-      ctx.fillRect(food.x * gridSize, food.y * gridSize, scale, scale);
+      ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
 
-      // Zeichne jede Schlange
-      for (let playerId in snakes) {
-        const snake = snakes[playerId];
-        ctx.fillStyle = snake.color;
-        snake.body.forEach(segment => {
-          ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
+      Object.values(players).forEach(player => {
+        ctx.fillStyle = player.color;
+        player.body.forEach(segment => {
+          ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, gridSize, gridSize);
         });
+      });
+    }
+
+    function updatePlayerInfo() {
+      if (snake) {
+        playerInfo.innerText = `Spieler: ${snake.name} | Punkte: ${snake.score}`;
       }
     }
 
-    // Tastenanschläge für Steuerung (Desktop)
     if (!isMobile) {
       window.addEventListener("keydown", (e) => {
         socket.emit("keyPress", e.key);
       });
     }
 
-    // Mobile Button-Steuerung (nur links und rechts)
-    document.getElementById("left").addEventListener("click", () => {
-      socket.emit("keyPress", "ArrowLeft");
-    });
-
-    document.getElementById("right").addEventListener("click", () => {
-      socket.emit("keyPress", "ArrowRight");
-    });
-
+    document.getElementById("turnLeft").addEventListener("click", () => socket.emit("keyPress", "ArrowLeft"));
+    document.getElementById("turnRight").addEventListener("click", () => socket.emit("keyPress", "ArrowRight"));
   </script>
 </body>
 </html>
