@@ -33,7 +33,7 @@
       margin-top: 10px;
     }
     #countdown {
-      font-size: 40px;
+      font-size: 80px;
       color: red;
       text-align: center;
       margin-top: 20px;
@@ -67,6 +67,7 @@
     let players = {};
     let food = {};
     let playerId = null;
+    let isInCountdown = false; // Flag, das angibt, ob der Countdown läuft
 
     // Spieler wird initialisiert
     socket.on("init", (data) => {
@@ -98,13 +99,20 @@
       if (countdown === 0) {
         setTimeout(() => {
           countdownElement.style.display = "none";
+          isInCountdown = false; // Countdown ist vorbei, Spielfeld soll wieder angezeigt werden
           drawGame(); // Nach dem Countdown das Spielfeld anzeigen
         }, 1000); // Nach einer Sekunde das Spielfeld wieder anzeigen
+      } else {
+        isInCountdown = true; // Countdown läuft, Spielfeld wird nicht angezeigt
       }
     });
 
     // Spiel zeichnen
     function drawGame() {
+      if (isInCountdown) {
+        return; // Zeige nur den Countdown, wenn dieser aktiv ist
+      }
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "red";
       ctx.fillRect(food.x * 20, food.y * 20, 20, 20);
@@ -115,7 +123,7 @@
       }
 
       document.getElementById("playerInfo").innerText =
-        `Spieler: ${players[playerId]?.name} | Punkte: ${players[playerId]?.score}`;
+        `Spieler: ${players[playerId]?.name} | Score: ${players[playerId]?.score}`;
     }
 
     // Tastatursteuerung
