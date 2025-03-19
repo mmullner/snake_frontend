@@ -23,7 +23,7 @@
       margin: 5px;
       text-align: center;
       line-height: 50px;
-      font-size: 16px;
+      font-size: 20px;
       cursor: pointer;
       border-radius: 10px;
     }
@@ -35,62 +35,46 @@
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="400" height="400"></canvas>
+  <canvas id="gameCanvas" width="800" height="800"></canvas>
+  <div id="playerInfo"></div>
 
-  <div id="playerInfo">Spieler: - | Punkte: 0</div>
-
-  <div class="controls">
-    <div class="button" id="turnLeft">← Links</div>
-    <div class="button" id="turnRight">→ Rechts</div>
+  <div class="controls" id="mobileControls" style="display: none;">
+    <div class="button" id="left">⟲ Left</div>
+    <div class="button" id="right">⟳ Right</div>
   </div>
 
   <script>
     const socket = io("https://snake1-kgp4.onrender.com");
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-    const playerInfo = document.getElementById("playerInfo");
 
-    const gridSize = 20;
-    let snake, food, players = {};
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if (isMobile) document.getElementById("mobileControls").style.display = "flex";
 
-    socket.on("init", (data) => {
-      players = data.players;
-      food = data.food;
-      snake = players[socket.id] || null;
-      updatePlayerInfo();
-      drawGame();
-    });
+    let players = {};
+    let food = {};
 
     socket.on("gameUpdate", (data) => {
       players = data.players;
       food = data.food;
-      snake = players[socket.id] || null;
-      updatePlayerInfo();
       drawGame();
     });
 
     function drawGame() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "red";
+      ctx.fillRect(food.x * 20, food.y * 20, 20, 20);
 
-      ctx.fillStyle = "green";
-      ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
-
-      Object.values(players).forEach(player => {
-        ctx.fillStyle = player.color;
-        player.body.forEach(segment => {
-          ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, gridSize, gridSize);
-        });
-      });
-    }
-
-    function updatePlayerInfo() {
-      if (snake) {
-        playerInfo.innerText = `Spieler: ${snake.name} | Punkte: ${snake.score}`;
+      for (let id in players) {
+        ctx.fillStyle = players[id].color;
+        players[id].body.forEach(segment => ctx.fillRect(segment[0] * 20, segment[1] * 20, 20, 20));
       }
+
+      document.getElementById("playerInfo").innerText = `Spieler: ${players[socket.id]?.name} | Punkte: ${players[socket.id]?.score}`;
     }
 
-    document.getElementById("turnLeft").addEventListener("click", () => socket.emit("keyPress", "ArrowLeft"));
-    document.getElementById("turnRight").addEventListener("click", () => socket.emit("keyPress", "ArrowRight"));
+    document.getElementById("left").addEventListener("click", () => socket.emit("keyPress", "ArrowLeft"));
+    document.getElementById("right").addEventListener("click", () => socket.emit("keyPress", "ArrowRight"));
   </script>
 </body>
 </html>
