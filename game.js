@@ -5,7 +5,7 @@ canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
 // Socket.IO connection
-const socket = io('https://your-backend-name.onrender.com');  // Replace with your backend URL
+const socket = io('https://snake1-kgp4.onrender.com');  // Replace with your backend URL
 
 // Snake Game Variables
 let snake = [{ x: canvas.width / 2, y: canvas.height / 2 }];
