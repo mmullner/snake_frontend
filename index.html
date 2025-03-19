@@ -33,16 +33,14 @@
 <body>
   <canvas id="gameCanvas" width="400" height="400"></canvas>
 
-  <!-- Buttons für mobile Steuerung -->
+  <!-- Buttons für mobile Steuerung: Nur "Turn Left" und "Turn Right" -->
   <div class="controls" id="mobileControls" style="display: none;">
-    <div class="button" id="up">↑</div>
     <div class="button" id="left">←</div>
     <div class="button" id="right">→</div>
-    <div class="button" id="down">↓</div>
   </div>
 
   <script>
-    const socket = io("https://snake1-kgp4.onrender.com");  // Backend-URL
+    const socket = io("https://snake1-kgp4.onrender.com");
 
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
@@ -50,9 +48,9 @@
     const gridSize = 20;
     const scale = 20;
 
-    let snake, food;
+    let snakes = {};  // Alle Schlangen werden hier gespeichert
+    let food;
 
-    // Gerät erkennen (mobile Geräte oder Computer)
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
     if (isMobile) {
@@ -60,23 +58,26 @@
     }
 
     socket.on("init", (data) => {
-      snake = data.snake;
+      snakes = data.players;  // Alle Spieler erhalten
       food = data.food;
       drawGame();
     });
 
     socket.on("gameUpdate", (data) => {
-      snake = data.players[Object.keys(data.players)[0]];  // Hol dir den ersten Spieler
+      snakes = data.players;  // Alle Schlangenstatus updaten
       food = data.food;
       drawGame();
     });
 
-    socket.on("gameOver", (data) => {
-      alert(`${data.winner} wins!`);
+    socket.on("newPlayer", (data) => {
+      // Hier kannst du Logik für neue Spieler hinzufügen, wenn nötig
+      console.log(`Neuer Spieler: ${data.id}`);
     });
 
-    socket.on("newPlayer", (data) => {
-      // Handle new player logic if necessary
+    socket.on("playerLeft", (data) => {
+      // Spieler, der das Spiel verlässt, entfernen
+      delete snakes[data.id];
+      drawGame();  // Spiel neu zeichnen
     });
 
     // Zeichnen des Spiels
@@ -87,11 +88,14 @@
       ctx.fillStyle = "green";
       ctx.fillRect(food.x * gridSize, food.y * gridSize, scale, scale);
 
-      // Zeichne Snake
-      ctx.fillStyle = snake.color;  // Verwende die zufällige Farbe des Spielers
-      snake.body.forEach(segment => {
-        ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
-      });
+      // Zeichne jede Schlange
+      for (let playerId in snakes) {
+        const snake = snakes[playerId];
+        ctx.fillStyle = snake.color;
+        snake.body.forEach(segment => {
+          ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
+        });
+      }
     }
 
     // Tastenanschläge für Steuerung (Desktop)
@@ -101,60 +105,15 @@
       });
     }
 
-    // Touch-Steuerung für Mobilgeräte
-    let touchStartX = 0;
-    let touchStartY = 0;
-
-    // Funktion, um die Richtung basierend auf der Wischbewegung zu ändern
-    function handleTouchStart(event) {
-      const touch = event.touches[0];
-      touchStartX = touch.pageX;
-      touchStartY = touch.pageY;
-    }
-
-    function handleTouchMove(event) {
-      const touch = event.touches[0];
-      const diffX = touch.pageX - touchStartX;
-      const diffY = touch.pageY - touchStartY;
-
-      if (Math.abs(diffX) > Math.abs(diffY)) {
-        // Horizontal wischen
-        if (diffX > 0) {
-          socket.emit("keyPress", "ArrowRight");  // nach rechts
-        } else {
-          socket.emit("keyPress", "ArrowLeft");  // nach links
-        }
-      } else {
-        // Vertikal wischen
-        if (diffY > 0) {
-          socket.emit("keyPress", "ArrowDown");  // nach unten
-        } else {
-          socket.emit("keyPress", "ArrowUp");  // nach oben
-        }
-      }
-      touchStartX = touch.pageX;
-      touchStartY = touch.pageY;
-    }
-
-    // Event-Listener für Touch-Events (nur wenn es sich um ein mobiles Gerät handelt)
-    if (isMobile) {
-      canvas.addEventListener("touchstart", handleTouchStart);
-      canvas.addEventListener("touchmove", handleTouchMove);
-    }
-
-    // Mobile Button-Steuerung (alternativ)
-    document.getElementById("up").addEventListener("click", () => {
-      socket.emit("keyPress", "ArrowUp");
-    });
-    document.getElementById("down").addEventListener("click", () => {
-      socket.emit("keyPress", "ArrowDown");
-    });
+    // Mobile Button-Steuerung (nur links und rechts)
     document.getElementById("left").addEventListener("click", () => {
       socket.emit("keyPress", "ArrowLeft");
     });
+
     document.getElementById("right").addEventListener("click", () => {
       socket.emit("keyPress", "ArrowRight");
     });
+
   </script>
 </body>
 </html>
