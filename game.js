@@ -5,7 +5,7 @@ canvas.width = 500;
 canvas.height = 500;
 
 // Connect to the backend via Socket.IO
-const socket = io('https://snake1-kgp4.onrender.com');  // Ersetze dies mit deiner Server-URL, wenn es auf Render.com läuft
+const socket = io('https://snake1-kgp4.onrender.com:3000');  // Ersetze dies mit deiner Server-URL, wenn es auf Render.com läuft
 
 // Snake Game Variables
 let players = {};
