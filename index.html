@@ -37,6 +37,11 @@
       color: red;
       text-align: center;
       margin-top: 20px;
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
     }
   </style>
 </head>
@@ -63,6 +68,7 @@
     let food = {};
     let playerId = null;
 
+    // Spieler wird initialisiert
     socket.on("init", (data) => {
       playerId = socket.id;
       players[playerId] = data.snake;
@@ -70,12 +76,14 @@
       drawGame();
     });
 
+    // Spiel aktualisieren
     socket.on("gameUpdate", (data) => {
       players = data.players;
       food = data.food;
       drawGame();
     });
 
+    // Spieler hat das Spiel verlassen
     socket.on("playerLeft", (data) => {
       delete players[data.id];
       drawGame();
@@ -83,7 +91,16 @@
 
     // Countdown anzeigen
     socket.on("countdown", (countdown) => {
+      countdownElement.style.display = "block";
       countdownElement.innerText = countdown;
+
+      // Countdown zurücksetzen und nach 3 Sekunden ausblenden
+      if (countdown === 0) {
+        setTimeout(() => {
+          countdownElement.style.display = "none";
+          drawGame(); // Nach dem Countdown das Spielfeld anzeigen
+        }, 1000); // Nach einer Sekunde das Spielfeld wieder anzeigen
+      }
     });
 
     // Spiel zeichnen
@@ -101,7 +118,10 @@
         `Spieler: ${players[playerId]?.name} | Punkte: ${players[playerId]?.score}`;
     }
 
+    // Tastatursteuerung
     window.addEventListener("keydown", (e) => socket.emit("keyPress", e.key));
+
+    // Steuerung für mobile Geräte
     document.getElementById("left").addEventListener("click", () => socket.emit("keyPress", "ArrowLeft"));
     document.getElementById("right").addEventListener("click", () => socket.emit("keyPress", "ArrowRight"));
   </script>
