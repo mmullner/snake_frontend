@@ -35,7 +35,7 @@
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="800" height="800"></canvas>
+  <canvas id="gameCanvas" width="400" height="400"></canvas>
   <div id="playerInfo"></div>
 
   <div class="controls" id="mobileControls" style="display: none;">
@@ -53,10 +53,23 @@
 
     let players = {};
     let food = {};
+    let playerId = null;
+
+    socket.on("init", (data) => {
+      playerId = socket.id;
+      players[playerId] = data.snake;
+      food = data.food;
+      drawGame();
+    });
 
     socket.on("gameUpdate", (data) => {
       players = data.players;
       food = data.food;
+      drawGame();
+    });
+
+    socket.on("playerLeft", (data) => {
+      delete players[data.id];
       drawGame();
     });
 
@@ -70,9 +83,11 @@
         players[id].body.forEach(segment => ctx.fillRect(segment[0] * 20, segment[1] * 20, 20, 20));
       }
 
-      document.getElementById("playerInfo").innerText = `Spieler: ${players[socket.id]?.name} | Punkte: ${players[socket.id]?.score}`;
+      document.getElementById("playerInfo").innerText =
+        `Spieler: ${players[playerId]?.name} | Punkte: ${players[playerId]?.score}`;
     }
 
+    window.addEventListener("keydown", (e) => socket.emit("keyPress", e.key));
     document.getElementById("left").addEventListener("click", () => socket.emit("keyPress", "ArrowLeft"));
     document.getElementById("right").addEventListener("click", () => socket.emit("keyPress", "ArrowRight"));
   </script>
