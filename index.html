@@ -1,81 +1,70 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Snake Game</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; }
-        canvas { background: #000; margin: 20px auto; display: block; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snake Game</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+  <style>
+    canvas {
+      border: 1px solid black;
+      display: block;
+      margin: 20px auto;
+    }
+  </style>
 </head>
 <body>
-    <h1>Snake Game</h1>
-    <canvas id="gameCanvas" width="400" height="400"></canvas>
-    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>  <!-- Socket.IO 4.0.1 -->
-    <script>
-        const socket = io("https://snake1-kgp4.onrender.com");  // Backend-Server-URL
+  <canvas id="gameCanvas" width="400" height="400"></canvas>
+  <script>
+    const socket = io("https://snake1-kgp4.onrender.com");  // Backend-URL
 
-        let snake = {};
-        let food = { x: 10, y: 10 };
-        let direction = { x: 1, y: 0 };  // Initiale Richtung (Rechts)
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
 
-        // Schlange initialisieren
-        socket.on('init', (data) => {
-            snake = data.snake;
-            food = data.food;
-            drawGame();
-        });
+    const gridSize = 20;
+    const scale = 20;
 
-        // Spiel-Update von Server empfangen
-        socket.on('gameUpdate', (data) => {
-            players = data.players;
-            food = data.food;
-            drawGame();
-        });
+    let snake, food;
 
-        // Spiel-Übertragung des GameOver-Status
-        socket.on('gameOver', (data) => {
-            alert(`${data.winner} Wins!`);
-        });
+    socket.on("init", (data) => {
+      snake = data.snake;
+      food = data.food;
+      drawGame();
+    });
 
-        // Spielersteuerung (Pfeiltasten)
-        document.addEventListener('keydown', (event) => {
-            socket.emit('keyPress', event.key);
-        });
+    socket.on("gameUpdate", (data) => {
+      snake = data.players[Object.keys(data.players)[0]];  // Hol dir den ersten Spieler
+      food = data.food;
+      drawGame();
+    });
 
-        // Spielfeld zeichnen
-        function drawGame() {
-            const canvas = document.getElementById('gameCanvas');
-            const ctx = canvas.getContext('2d');
+    socket.on("gameOver", (data) => {
+      alert(`${data.winner} wins!`);
+    });
 
-            // Spielfeld löschen
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+    socket.on("newPlayer", (data) => {
+      // Handle new player logic if necessary
+    });
 
-            // Schlange zeichnen
-            ctx.fillStyle = "green";
-            for (let i = 0; i < snake.body.length; i++) {
-                const segment = snake.body[i];
-                ctx.fillRect(segment[0] * 20, segment[1] * 20, 20, 20);
-            }
+    // Zeichnen des Spiels
+    function drawGame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // Nahrung zeichnen
-            ctx.fillStyle = "red";
-            ctx.fillRect(food.x * 20, food.y * 20, 20, 20);
-        }
+      // Zeichne Food
+      ctx.fillStyle = "green";
+      ctx.fillRect(food.x * gridSize, food.y * gridSize, scale, scale);
 
-        // Spiel starten
-        function startGame() {
-            const canvas = document.createElement('canvas');
-            canvas.id = 'gameCanvas';
-            canvas.width = 400;
-            canvas.height = 400;
-            document.body.appendChild(canvas);
+      // Zeichne Snake
+      ctx.fillStyle = "blue";
+      snake.body.forEach(segment => {
+        ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
+      });
+    }
 
-            drawGame();
-        }
-
-        startGame();
-    </script>
+    // Tastenanschläge für Steuerung
+    window.addEventListener("keydown", (e) => {
+      socket.emit("keyPress", e.key);
+    });
+  </script>
 </body>
 </html>
