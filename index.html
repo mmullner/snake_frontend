@@ -1,151 +1,81 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Snake Game</title>
-  <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      background-color: #f0f0f0;
-    }
-    canvas {
-      border: 1px solid black;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake Game</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        canvas { background: #000; margin: 20px auto; display: block; }
+    </style>
 </head>
 <body>
-  <canvas id="gameCanvas"></canvas>
+    <h1>Snake Game</h1>
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>  <!-- Socket.IO 4.0.1 -->
+    <script>
+        const socket = io("https://snake1-kgp4.onrender.com");  // Backend-Server-URL
 
-  <!-- Socket.IO Client -->
-  <script src="https://snake1-kgp4.onrender.com/socket.io/socket.io.js"></script> <!-- Dein Backend-Server -->
-  <script>
-    const socket = io("https://snake1-kgp4.onrender.com"); // Verbindung zum Backend
+        let snake = {};
+        let food = { x: 10, y: 10 };
+        let direction = { x: 1, y: 0 };  // Initiale Richtung (Rechts)
 
-    let canvas = document.getElementById("gameCanvas");
-    let ctx = canvas.getContext("2d");
+        // Schlange initialisieren
+        socket.on('init', (data) => {
+            snake = data.snake;
+            food = data.food;
+            drawGame();
+        });
 
-    // Spielvariablen
-    let snake = [];
-    let food = {};
-    let gameOver = false;
+        // Spiel-Update von Server empfangen
+        socket.on('gameUpdate', (data) => {
+            players = data.players;
+            food = data.food;
+            drawGame();
+        });
 
-    // Spielgröße und Schlangeneinstellungen
-    const scale = 20;
-    const rows = 20;
-    const columns = 20;
+        // Spiel-Übertragung des GameOver-Status
+        socket.on('gameOver', (data) => {
+            alert(`${data.winner} Wins!`);
+        });
 
-    canvas.width = columns * scale;
-    canvas.height = rows * scale;
+        // Spielersteuerung (Pfeiltasten)
+        document.addEventListener('keydown', (event) => {
+            socket.emit('keyPress', event.key);
+        });
 
-    // Spiel-Logik
-    const initGame = () => {
-      snake = [
-        { x: 5, y: 5 },
-        { x: 5, y: 4 },
-        { x: 5, y: 3 }
-      ];
+        // Spielfeld zeichnen
+        function drawGame() {
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
 
-      food = generateFood();
-      gameOver = false;
-    };
+            // Spielfeld löschen
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const generateFood = () => {
-      const x = Math.floor(Math.random() * rows);
-      const y = Math.floor(Math.random() * columns);
-      return { x, y };
-    };
+            // Schlange zeichnen
+            ctx.fillStyle = "green";
+            for (let i = 0; i < snake.body.length; i++) {
+                const segment = snake.body[i];
+                ctx.fillRect(segment[0] * 20, segment[1] * 20, 20, 20);
+            }
 
-    const drawGame = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // Nahrung zeichnen
+            ctx.fillStyle = "red";
+            ctx.fillRect(food.x * 20, food.y * 20, 20, 20);
+        }
 
-      // Schlange zeichnen
-      for (let i = 0; i < snake.length; i++) {
-        ctx.fillStyle = i === 0 ? "green" : "white";
-        ctx.fillRect(snake[i].x * scale, snake[i].y * scale, scale, scale);
-        ctx.strokeStyle = "black";
-        ctx.strokeRect(snake[i].x * scale, snake[i].y * scale, scale, scale);
-      }
+        // Spiel starten
+        function startGame() {
+            const canvas = document.createElement('canvas');
+            canvas.id = 'gameCanvas';
+            canvas.width = 400;
+            canvas.height = 400;
+            document.body.appendChild(canvas);
 
-      // Nahrung zeichnen
-      ctx.fillStyle = "red";
-      ctx.fillRect(food.x * scale, food.y * scale, scale, scale);
-    };
+            drawGame();
+        }
 
-    const updateGame = () => {
-      if (gameOver) return;
-
-      // Neue Position der Schlange
-      let head = { ...snake[0] };
-
-      // Bewegungslogik
-      if (keyPress === "ArrowUp") head.y--;
-      if (keyPress === "ArrowDown") head.y++;
-      if (keyPress === "ArrowLeft") head.x--;
-      if (keyPress === "ArrowRight") head.x++;
-
-      // Kollision mit sich selbst oder mit den Wänden
-      if (
-        head.x < 0 ||
-        head.x >= rows ||
-        head.y < 0 ||
-        head.y >= columns ||
-        snake.some(segment => segment.x === head.x && segment.y === head.y)
-      ) {
-        gameOver = true;
-        socket.emit("gameOver", { winner: "Blue" });
-        return;
-      }
-
-      snake.unshift(head);
-
-      // Kollision mit Nahrung
-      if (head.x === food.x && head.y === food.y) {
-        food = generateFood(); // Neue Nahrung erzeugen
-      } else {
-        snake.pop(); // Das letzte Segment entfernen
-      }
-
-      drawGame();
-    };
-
-    // Steuerung des Spiels über Pfeiltasten
-    let keyPress = null;
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowUp" && keyPress !== "ArrowDown") keyPress = "ArrowUp";
-      if (e.key === "ArrowDown" && keyPress !== "ArrowUp") keyPress = "ArrowDown";
-      if (e.key === "ArrowLeft" && keyPress !== "ArrowRight") keyPress = "ArrowLeft";
-      if (e.key === "ArrowRight" && keyPress !== "ArrowLeft") keyPress = "ArrowRight";
-    });
-
-    // Verbindung mit dem Server
-    socket.on("init", (data) => {
-      initGame();
-      drawGame();
-    });
-
-    // Game Update vom Backend erhalten
-    socket.on("gameUpdate", (data) => {
-      snake = data.snake;
-      food = data.food;
-      drawGame();
-    });
-
-    // Spiel starten
-    const gameLoop = () => {
-      if (!gameOver) {
-        updateGame();
-      }
-      setTimeout(gameLoop, 100);
-    };
-
-    gameLoop();
-
-  </script>
+        startGame();
+    </script>
 </body>
 </html>
