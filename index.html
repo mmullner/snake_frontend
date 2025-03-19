@@ -32,11 +32,18 @@
       font-size: 18px;
       margin-top: 10px;
     }
+    #countdown {
+      font-size: 40px;
+      color: red;
+      text-align: center;
+      margin-top: 20px;
+    }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas" width="400" height="400"></canvas>
   <div id="playerInfo"></div>
+  <div id="countdown"></div>
 
   <div class="controls" id="mobileControls" style="display: none;">
     <div class="button" id="left">⟲ Left</div>
@@ -47,6 +54,7 @@
     const socket = io("https://snake1-kgp4.onrender.com");
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
+    const countdownElement = document.getElementById("countdown");
 
     const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (isMobile) document.getElementById("mobileControls").style.display = "flex";
@@ -73,6 +81,12 @@
       drawGame();
     });
 
+    // Countdown anzeigen
+    socket.on("countdown", (countdown) => {
+      countdownElement.innerText = countdown;
+    });
+
+    // Spiel zeichnen
     function drawGame() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = "red";
