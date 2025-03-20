@@ -47,6 +47,10 @@
       font-size: 18px;
       margin-top: 10px;
     }
+    .player-score {
+      font-weight: bold;
+      font-size: 20px;
+    }
   </style>
 </head>
 <body>
@@ -127,8 +131,13 @@
 
         // Punkteanzeige
         if (players[playerId]) {
-          document.getElementById("playerInfo").innerText =
-            `${players[playerId].name} | Score: ${players[playerId].score}`;
+          const player = players[playerId];
+          const playerInfo = document.getElementById("playerInfo");
+          playerInfo.innerHTML = `
+            <p class="player-score" style="color: ${player.color};">
+              ${player.name} | Score: <strong>${player.score}</strong>
+            </p>
+          `;
         }
       }
 
