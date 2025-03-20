@@ -58,8 +58,8 @@
 
     <!-- Mobile Steuerung -->
     <div id="controls">
-        <button class="control-btn" onclick="sendDirection('ArrowLeft')">⬅️ Links</button>
-        <button class="control-btn" onclick="sendDirection('ArrowRight')">➡️ Rechts</button>
+        <button class="control-btn" onclick="sendDirection('left')">⬅️ Links</button>
+        <button class="control-btn" onclick="sendDirection('right')">➡️ Rechts</button>
     </div>
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
@@ -88,16 +88,17 @@
                     clearInterval(interval);
                     countdownElement.style.display = "none";
                     gameActive = true;
-                    if (callback) callback();
+                    if (callback) callback(); // Startet das Spiel nach dem Countdown
                 }
             }, 1000);
         }
 
-        // 🎮 Verbindung herstellen & Spiel initialisieren
-        socket.on("init", (data) => {
-            players = data.players;
-            food = data.food;
-            startCountdown(drawGame); // Starte das Spiel nach dem Countdown
+        // 🎮 Verbindung herstellen & Countdown starten
+        socket.on("connect", () => {
+            startCountdown(() => {
+                // Nachdem der Countdown vorbei ist, Player erstellen und Spiel starten
+                socket.emit("newPlayer"); // Spiel mit neuem Spieler starten
+            });
         });
 
         // 🏃‍♂️ Spiel-Update empfangen
@@ -125,18 +126,22 @@
             ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
         }
 
-        // ⌨️ Tastatursteuerung senden
-        window.addEventListener("keydown", (event) => {
+        // 🔄 Steuerung relativ zur aktuellen Richtung senden
+        function changeDirection(turn) {
             if (!gameActive) return;
-            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-                socket.emit("keyPress", event.key);
-            }
+
+            socket.emit("keyPress", turn); // "left" oder "right" senden
+        }
+
+        // ⌨️ Tastatursteuerung
+        window.addEventListener("keydown", (event) => {
+            if (event.key === "ArrowLeft") changeDirection("left");
+            if (event.key === "ArrowRight") changeDirection("right");
         });
 
-        // 📱 Mobile Steuerung senden
+        // 📱 Mobile Steuerung
         function sendDirection(direction) {
-            if (!gameActive) return;
-            socket.emit("keyPress", direction);
+            changeDirection(direction);
         }
     </script>
 </body>
