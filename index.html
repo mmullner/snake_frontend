@@ -119,7 +119,9 @@
 
         // Food zeichnen
         ctx.fillStyle = "red";
-        ctx.fillRect(food.x * 20, food.y * 20, 20, 20);
+        food.forEach((foodItem) => {
+        ctx.fillRect(foodItem.x * 20, foodItem.y * 20, 20, 20);
+  });
 
         // Spieler zeichnen
         for (let id in players) {
