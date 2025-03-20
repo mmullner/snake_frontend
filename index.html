@@ -8,7 +8,7 @@
   <style>
     canvas {
       border: 1px solid black;
-      display: block;
+      display: none; /* Spielfeld verstecken bis Countdown vorbei ist */
       margin: 20px auto;
     }
 
@@ -16,7 +16,7 @@
       display: flex;
       justify-content: center;
       margin-top: 20px;
-      display: none; /* Initially hide controls */
+      display: none;
     }
 
     .button {
@@ -35,6 +35,7 @@
       text-align: center;
       font-size: 20px;
       margin-top: 20px;
+      display: none; /* Erst nach Countdown sichtbar */
     }
 
     #countdown {
@@ -58,23 +59,17 @@
   <div id="playerInfo"></div>
 
   <script>
-    const socket = io("https://snake1-kgp4.onrender.com");  // Backend-URL
+    const socket = io("https://snake1-kgp4.onrender.com");
 
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
 
-    const gridSize = 20;
-    const scale = 20;
     let snake, food, playerName, score, gameStarted = false;
-
-    // Countdown Timer
     let countdownValue = 3;
 
-    // Überprüfen, ob der Benutzer ein mobiles Gerät verwendet
     const isMobile = window.innerWidth <= 768 || /Mobi|Android/i.test(navigator.userAgent);
-
     if (isMobile) {
-      document.getElementById("mobileControls").style.display = "flex";  // Zeige mobile Steuerung
+      document.getElementById("mobileControls").style.display = "flex";
     }
 
     socket.on("init", (data) => {
@@ -83,27 +78,34 @@
       playerName = data.playerName;
       score = 0;
       gameStarted = false;
+
       document.getElementById("playerInfo").innerHTML = `Player: ${playerName} | Score: ${score}`;
       startCountdown();
     });
 
     socket.on("gameUpdate", (data) => {
-      snake = data.players[Object.keys(data.players)[0]];  // Get first player
+      if (!gameStarted) return;
+
+      snake = data.players[Object.keys(data.players)[0]];
       food = data.food;
       score = snake.score;
+
       document.getElementById("playerInfo").innerHTML = `Player: ${playerName} | Score: ${score}`;
       drawGame();
     });
 
     socket.on("gameOver", (data) => {
       alert(`${data.winner} wins!`);
-      startCountdown(); // Restart the countdown after a game over
+      startCountdown();
     });
 
     function startCountdown() {
       const countdownElement = document.getElementById("countdown");
       countdownElement.style.display = "block";
       countdownElement.innerHTML = countdownValue;
+
+      document.getElementById("gameCanvas").style.display = "none";
+      document.getElementById("playerInfo").style.display = "none";
 
       const countdownInterval = setInterval(() => {
         countdownValue--;
@@ -112,7 +114,12 @@
         if (countdownValue <= 0) {
           clearInterval(countdownInterval);
           countdownElement.style.display = "none";
-          gameStarted = true;  // Start the game after countdown ends
+          gameStarted = true;
+
+          document.getElementById("gameCanvas").style.display = "block";
+          document.getElementById("playerInfo").style.display = "block";
+
+          drawGame();
         }
       }, 1000);
     }
@@ -122,67 +129,34 @@
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw food
       ctx.fillStyle = "green";
-      ctx.fillRect(food.x * gridSize, food.y * gridSize, scale, scale);
+      ctx.fillRect(food.x * 20, food.y * 20, 20, 20);
 
-      // Draw snake
       ctx.fillStyle = snake.color;
       snake.body.forEach(segment => {
-        ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
+        ctx.fillRect(segment[0] * 20, segment[1] * 20, 20, 20);
       });
     }
 
-    // Handle keypress for desktop controls (only left and right)
     window.addEventListener("keydown", (e) => {
-      if (!gameStarted) return;
+      if (!gameStarted || !snake || !snake.direction) return;
 
       if (e.key === "ArrowLeft" && snake.direction.x !== 1) {
-        socket.emit("keyPress", "ArrowLeft");
+        socket.emit("keyPress", { direction: "ArrowLeft" });
       } else if (e.key === "ArrowRight" && snake.direction.x !== -1) {
-        socket.emit("keyPress", "ArrowRight");
+        socket.emit("keyPress", { direction: "ArrowRight" });
       }
     });
 
-    // Handle touch control for mobile (only left and right)
-    let touchStartX = 0;
-    let touchStartY = 0;
-
-    function handleTouchStart(event) {
-      const touch = event.touches[0];
-      touchStartX = touch.pageX;
-      touchStartY = touch.pageY;
-    }
-
-    function handleTouchMove(event) {
-      const touch = event.touches[0];
-      const diffX = touch.pageX - touchStartX;
-      const diffY = touch.pageY - touchStartY;
-
-      // Only consider horizontal swipe (left or right)
-      if (Math.abs(diffX) > Math.abs(diffY)) {
-        if (diffX > 0 && snake.direction.x !== -1) {
-          socket.emit("keyPress", "ArrowRight");
-        } else if (diffX < 0 && snake.direction.x !== 1) {
-          socket.emit("keyPress", "ArrowLeft");
-        }
-      }
-      touchStartX = touch.pageX;
-      touchStartY = touch.pageY;
-    }
-
-    canvas.addEventListener("touchstart", handleTouchStart);
-    canvas.addEventListener("touchmove", handleTouchMove);
-
-    // Mobile button controls (only left and right)
     document.getElementById("left").addEventListener("click", () => {
-      if (gameStarted && snake.direction.x !== 1) {
-        socket.emit("keyPress", "ArrowLeft");
+      if (gameStarted && snake && snake.direction && snake.direction.x !== 1) {
+        socket.emit("keyPress", { direction: "ArrowLeft" });
       }
     });
+
     document.getElementById("right").addEventListener("click", () => {
-      if (gameStarted && snake.direction.x !== -1) {
-        socket.emit("keyPress", "ArrowRight");
+      if (gameStarted && snake && snake.direction && snake.direction.x !== -1) {
+        socket.emit("keyPress", { direction: "ArrowRight" });
       }
     });
 
