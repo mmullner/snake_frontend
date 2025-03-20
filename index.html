@@ -92,20 +92,20 @@
       const ctx = canvas.getContext("2d");
 
       let players = {};
-      let food = [];  // food ist nun ein Array, um mehrere Food-Objekte zu speichern
+      let food = {};
       let playerId = null;
 
       // Direkt zeichnen, sobald Daten eintreffen
       socket.on("init", (data) => {
         playerId = socket.id;
         players[playerId] = data.snake;
-        food = data.food;  // food sollte nun ein Array sein
+        food = data.food;
         drawGame();
       });
 
       socket.on("gameUpdate", (data) => {
         players = data.players;
-        food = data.food;  // food wird als Array von Objekten behandelt
+        food = data.food;
         drawGame();
       });
 
@@ -117,11 +117,9 @@
       function drawGame() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // Alle Food-Objekte zeichnen
+        // Food zeichnen
         ctx.fillStyle = "red";
-        food.forEach((foodItem) => {
-          ctx.fillRect(foodItem.x * 20, foodItem.y * 20, 20, 20);  // Zeichne jedes Food-Element
-        });
+        ctx.fillRect(food.x * 20, food.y * 20, 20, 20);
 
         // Spieler zeichnen
         for (let id in players) {
