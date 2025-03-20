@@ -27,7 +27,7 @@
       background-color: #f0f0f0;
     }
     .controls {
-      display: none; /* Jetzt standardmäßig unsichtbar */
+      display: none;
       justify-content: center;
       margin-top: 10px;
     }
@@ -69,6 +69,7 @@
     const gameContainer = document.getElementById("gameContainer");
     const mobileControls = document.getElementById("mobileControls");
 
+    // Countdown-Funktion
     const countdownInterval = setInterval(() => {
       count--;
       if (count > 0) {
@@ -77,7 +78,7 @@
         clearInterval(countdownInterval);
         countdownElement.style.display = "none";
         gameContainer.style.display = "block";
-        startGame();
+        startGame();  // Spiel sofort starten
       }
     }, 1000);
 
@@ -89,8 +90,8 @@
       let players = {};
       let food = {};
       let playerId = null;
-      let gameStarted = false;
 
+      // Direkt zeichnen, sobald Daten eintreffen
       socket.on("init", (data) => {
         playerId = socket.id;
         players[playerId] = data.snake;
@@ -99,7 +100,6 @@
       });
 
       socket.on("gameUpdate", (data) => {
-        if (!gameStarted) return;
         players = data.players;
         food = data.food;
         drawGame();
@@ -111,12 +111,13 @@
       });
 
       function drawGame() {
-        if (!gameStarted) return;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+        // Food zeichnen
         ctx.fillStyle = "red";
         ctx.fillRect(food.x * 20, food.y * 20, 20, 20);
 
+        // Spieler zeichnen
         for (let id in players) {
           ctx.fillStyle = players[id].color;
           players[id].body.forEach(segment => {
@@ -124,22 +125,19 @@
           });
         }
 
+        // Punkteanzeige
         if (players[playerId]) {
           document.getElementById("playerInfo").innerText =
             `Spieler: ${players[playerId].name} | Punkte: ${players[playerId].score}`;
         }
       }
 
-      setTimeout(() => {
-        gameStarted = true;
-        drawGame();
+      // Mobile Steuerung erst nach dem Countdown sichtbar machen
+      if (/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+        mobileControls.style.display = "flex";
+      }
 
-        const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-        if (isMobile) {
-          mobileControls.style.display = "flex";
-        }
-      }, 3000);
-
+      // Steuerung
       window.addEventListener("keydown", (e) => {
         if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
           socket.emit("keyPress", e.key);
