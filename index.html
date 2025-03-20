@@ -10,6 +10,9 @@
             color: white;
             font-family: Arial, sans-serif;
             text-align: center;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
         }
         canvas {
             border: 2px solid white;
@@ -26,6 +29,26 @@
             top: 40%;
             color: red;
         }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        .control-btn {
+            background-color: gray;
+            color: white;
+            font-size: 24px;
+            padding: 15px 30px;
+            border: none;
+            cursor: pointer;
+            border-radius: 10px;
+        }
+        .control-btn:active {
+            background-color: darkgray;
+        }
     </style>
 </head>
 <body>
@@ -33,13 +56,18 @@
     <canvas id="gameCanvas" width="600" height="600"></canvas>
     <div id="countdown">3</div>
 
+    <!-- Mobile Steuerung -->
+    <div id="controls">
+        <button class="control-btn" onclick="sendDirection('ArrowLeft')">⬅️ Links</button>
+        <button class="control-btn" onclick="sendDirection('ArrowRight')">➡️ Rechts</button>
+    </div>
+
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script>
         const socket = io("https://snake1-kgp4.onrender.com"); // Backend-URL anpassen
 
         const canvas = document.getElementById("gameCanvas");
         const ctx = canvas.getContext("2d");
-
         const countdownElement = document.getElementById("countdown");
 
         let gameActive = false;
@@ -47,34 +75,36 @@
         let food = { x: 10, y: 10 };
         const gridSize = 20;
 
-        // ⏳ Countdown vom Server empfangen und anzeigen
-        socket.on("countdown", (count) => {
-            if (count > 0) {
+        // ⏳ Countdown im Frontend starten
+        function startCountdown(callback) {
+            let count = 3;
+            countdownElement.innerText = count;
+            countdownElement.style.display = "block";
+
+            const interval = setInterval(() => {
+                count--;
                 countdownElement.innerText = count;
-                countdownElement.style.display = "block";
-            } else {
-                countdownElement.style.display = "none";
-                gameActive = true;
-            }
-        });
+                if (count <= 0) {
+                    clearInterval(interval);
+                    countdownElement.style.display = "none";
+                    gameActive = true;
+                    if (callback) callback();
+                }
+            }, 1000);
+        }
 
-        // 🎮 Spiel-Start-Signal vom Server empfangen
-        socket.on("gameStart", () => {
-            gameActive = true;
-        });
-
-        // 📜 Spieler-Daten vom Server empfangen
+        // 🎮 Verbindung herstellen & Spiel initialisieren
         socket.on("init", (data) => {
             players = data.players;
             food = data.food;
-            drawGame();
+            startCountdown(drawGame); // Starte das Spiel nach dem Countdown
         });
 
         // 🏃‍♂️ Spiel-Update empfangen
         socket.on("gameUpdate", (data) => {
             players = data.players;
             food = data.food;
-            drawGame();
+            if (gameActive) drawGame();
         });
 
         // 🎮 Spielfeld zeichnen
@@ -95,11 +125,19 @@
             ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
         }
 
-        // ⌨️ Steuerung senden
+        // ⌨️ Tastatursteuerung senden
         window.addEventListener("keydown", (event) => {
             if (!gameActive) return;
-            socket.emit("keyPress", event.key);
+            if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+                socket.emit("keyPress", event.key);
+            }
         });
+
+        // 📱 Mobile Steuerung senden
+        function sendDirection(direction) {
+            if (!gameActive) return;
+            socket.emit("keyPress", direction);
+        }
     </script>
 </body>
 </html>
