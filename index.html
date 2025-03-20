@@ -6,13 +6,28 @@
   <title>Snake Multiplayer</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
   <style>
+    body {
+      text-align: center;
+    }
+    #countdown {
+      font-size: 140px;
+      font-weight: bold;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+    #gameContainer {
+      display: none;
+    }
     canvas {
       border: 1px solid black;
       display: block;
       margin: 20px auto;
+      background-color: #f0f0f0;
     }
     .controls {
-      display: flex;
+      display: none; /* Jetzt standardmäßig unsichtbar */
       justify-content: center;
       margin-top: 10px;
     }
@@ -35,84 +50,109 @@
   </style>
 </head>
 <body>
-  <canvas id="gameCanvas" width="400" height="400"></canvas>
-  <div id="playerInfo"></div>
 
-  <div class="controls" id="mobileControls" style="display: none;">
-    <div class="button" id="left">⟲ Left</div>
-    <div class="button" id="right">⟳ Right</div>
+  <div id="countdown">3</div>
+
+  <div id="gameContainer">
+    <canvas id="gameCanvas" width="400" height="400"></canvas>
+    <div id="playerInfo"></div>
+
+    <div class="controls" id="mobileControls">
+      <div class="button" id="left">⟲ Left</div>
+      <div class="button" id="right">⟳ Right</div>
+    </div>
   </div>
 
   <script>
-    const socket = io("https://snake1-kgp4.onrender.com");
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
+    let count = 3;
+    const countdownElement = document.getElementById("countdown");
+    const gameContainer = document.getElementById("gameContainer");
+    const mobileControls = document.getElementById("mobileControls");
 
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile) document.getElementById("mobileControls").style.display = "flex";
+    const countdownInterval = setInterval(() => {
+      count--;
+      if (count > 0) {
+        countdownElement.innerText = count;
+      } else {
+        clearInterval(countdownInterval);
+        countdownElement.style.display = "none";
+        gameContainer.style.display = "block";
+        startGame();
+      }
+    }, 1000);
 
-    let players = {};
-    let food = {};
-    let playerId = null;
+    function startGame() {
+      const socket = io("https://snake1-kgp4.onrender.com");
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
 
-    // Initialisieren, wenn der Spieler verbunden wird
-    socket.on("init", (data) => {
-      playerId = socket.id;
-      players[playerId] = data.snake;
-      food = data.food;
-      drawGame();
-    });
+      let players = {};
+      let food = {};
+      let playerId = null;
+      let gameStarted = false;
 
-    // Wenn sich das Spiel aktualisiert
-    socket.on("gameUpdate", (data) => {
-      players = data.players;
-      food = data.food;
-      drawGame();
-    });
+      socket.on("init", (data) => {
+        playerId = socket.id;
+        players[playerId] = data.snake;
+        food = data.food;
+        drawGame();
+      });
 
-    // Wenn ein Spieler das Spiel verlässt
-    socket.on("playerLeft", (data) => {
-      delete players[data.id];
-      drawGame();
-    });
+      socket.on("gameUpdate", (data) => {
+        if (!gameStarted) return;
+        players = data.players;
+        food = data.food;
+        drawGame();
+      });
 
-    // Funktion zum Zeichnen des Spiels
-    function drawGame() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      socket.on("playerLeft", (data) => {
+        delete players[data.id];
+        drawGame();
+      });
 
-      // Essen zeichnen
-      ctx.fillStyle = "red";
-      ctx.fillRect(food.x * 20, food.y * 20, 20, 20);
+      function drawGame() {
+        if (!gameStarted) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Spieler zeichnen
-      for (let id in players) {
-        ctx.fillStyle = players[id].color;
-        players[id].body.forEach(segment => {
-          ctx.fillRect(segment[0] * 20, segment[1] * 20, 20, 20);
-        });
+        ctx.fillStyle = "red";
+        ctx.fillRect(food.x * 20, food.y * 20, 20, 20);
+
+        for (let id in players) {
+          ctx.fillStyle = players[id].color;
+          players[id].body.forEach(segment => {
+            ctx.fillRect(segment[0] * 20, segment[1] * 20, 20, 20);
+          });
+        }
+
+        if (players[playerId]) {
+          document.getElementById("playerInfo").innerText =
+            `Spieler: ${players[playerId].name} | Punkte: ${players[playerId].score}`;
+        }
       }
 
-      // Spielerinformationen anzeigen
-      if (players[playerId]) {
-        document.getElementById("playerInfo").innerText =
-          `Spieler: ${players[playerId].name} | Punkte: ${players[playerId].score}`;
-      }
+      setTimeout(() => {
+        gameStarted = true;
+        drawGame();
+
+        const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (isMobile) {
+          mobileControls.style.display = "flex";
+        }
+      }, 3000);
+
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          socket.emit("keyPress", e.key);
+        }
+      });
+
+      document.getElementById("left").addEventListener("click", () => {
+        socket.emit("keyPress", "ArrowLeft");
+      });
+      document.getElementById("right").addEventListener("click", () => {
+        socket.emit("keyPress", "ArrowRight");
+      });
     }
-
-    // Tastaturereignis für die PC-Steuerung
-    window.addEventListener("keydown", (e) => {
-      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-        socket.emit("keyPress", e.key);
-      }
-    });
-
-    // Mobile Steuerung
-    document.getElementById("left").addEventListener("click", () => {
-      socket.emit("keyPress", "ArrowLeft");
-    });
-    document.getElementById("right").addEventListener("click", () => {
-      socket.emit("keyPress", "ArrowRight");
-    });
   </script>
 </body>
 </html>
