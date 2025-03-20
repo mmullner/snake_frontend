@@ -11,12 +11,14 @@
       display: block;
       margin: 20px auto;
     }
-    /* Optionale Buttons für mobile Steuerung */
+
     .controls {
       display: flex;
       justify-content: center;
       margin-top: 20px;
+      display: none; /* Initially hide controls */
     }
+
     .button {
       width: 50px;
       height: 50px;
@@ -28,16 +30,32 @@
       cursor: pointer;
       border-radius: 50%;
     }
+
+    #playerInfo {
+      text-align: center;
+      font-size: 20px;
+      margin-top: 20px;
+    }
+
+    #countdown {
+      font-size: 120px;
+      text-align: center;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      display: none;
+    }
   </style>
 </head>
 <body>
   <canvas id="gameCanvas" width="400" height="400"></canvas>
-
-  <!-- Buttons für mobile Steuerung -->
-  <div class="controls">
+  <div class="controls" id="mobileControls">
     <div class="button" id="left">←</div>
     <div class="button" id="right">→</div>
   </div>
+  <div id="countdown"></div>
+  <div id="playerInfo"></div>
 
   <script>
     const socket = io("https://snake1-kgp4.onrender.com");  // Backend-URL
@@ -47,88 +65,86 @@
 
     const gridSize = 20;
     const scale = 20;
+    let snake, food, playerName, score, gameStarted = false;
 
-    let snake, food, countdown, gameStarted;
+    // Countdown Timer
+    let countdownValue = 3;
 
-    // Funktion, um das Spiel zu starten
-    function startGame() {
-      gameStarted = false;
-      countdown = 3;  // Countdown auf 3 Sekunden setzen
-      socket.emit("startGame");  // Signal an Backend, dass der Countdown startet
-      setInterval(updateCountdown, 1000);  // Countdown jede Sekunde aktualisieren
-    }
+    // Überprüfen, ob der Benutzer ein mobiles Gerät verwendet
+    const isMobile = window.innerWidth <= 768 || /Mobi|Android/i.test(navigator.userAgent);
 
-    // Countdown aktualisieren
-    function updateCountdown() {
-      if (countdown > 0) {
-        countdown--;
-      } else {
-        gameStarted = true;  // Spiel starten
-        socket.emit("gameStart");  // Signal an Backend, dass das Spiel beginnt
-        drawGame();  // Zeichne das Spiel
-      }
-    }
-
-    // Zeichne den Countdown
-    function drawCountdown() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);  // Bildschirm löschen
-      ctx.fillStyle = "black";
-      ctx.font = "120px Arial";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(countdown, canvas.width / 2, canvas.height / 2);
-    }
-
-    // Zeichnen des Spiels
-    function drawGame() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);  // Bildschirm löschen
-
-      if (gameStarted) {
-        // Zeichne Food
-        ctx.fillStyle = "green";
-        ctx.fillRect(food.x * gridSize, food.y * gridSize, scale, scale);
-
-        // Zeichne Snake
-        ctx.fillStyle = snake.color;  // Verwende die zufällige Farbe des Spielers
-        snake.body.forEach(segment => {
-          ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
-        });
-      } else {
-        drawCountdown();  // Zeige Countdown, wenn das Spiel noch nicht gestartet wurde
-      }
+    if (isMobile) {
+      document.getElementById("mobileControls").style.display = "flex";  // Zeige mobile Steuerung
     }
 
     socket.on("init", (data) => {
       snake = data.snake;
       food = data.food;
-      drawGame();
+      playerName = data.playerName;
+      score = 0;
+      gameStarted = false;
+      document.getElementById("playerInfo").innerHTML = `Player: ${playerName} | Score: ${score}`;
+      startCountdown();
     });
 
     socket.on("gameUpdate", (data) => {
-      snake = data.players[Object.keys(data.players)[0]];  // Hol dir den ersten Spieler
+      snake = data.players[Object.keys(data.players)[0]];  // Get first player
       food = data.food;
+      score = snake.score;
+      document.getElementById("playerInfo").innerHTML = `Player: ${playerName} | Score: ${score}`;
       drawGame();
     });
 
     socket.on("gameOver", (data) => {
       alert(`${data.winner} wins!`);
+      startCountdown(); // Restart the countdown after a game over
     });
 
-    socket.on("newPlayer", (data) => {
-      // Handle new player logic if necessary
-    });
+    function startCountdown() {
+      const countdownElement = document.getElementById("countdown");
+      countdownElement.style.display = "block";
+      countdownElement.innerHTML = countdownValue;
 
-    // Tastenanschläge für Steuerung (nur rechts und links)
-    window.addEventListener("keydown", (e) => {
-      if (gameStarted) {
-        // Nur nach links oder rechts abbiegen
-        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-          socket.emit("keyPress", e.key);
+      const countdownInterval = setInterval(() => {
+        countdownValue--;
+        countdownElement.innerHTML = countdownValue;
+
+        if (countdownValue <= 0) {
+          clearInterval(countdownInterval);
+          countdownElement.style.display = "none";
+          gameStarted = true;  // Start the game after countdown ends
         }
+      }, 1000);
+    }
+
+    function drawGame() {
+      if (!gameStarted) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Draw food
+      ctx.fillStyle = "green";
+      ctx.fillRect(food.x * gridSize, food.y * gridSize, scale, scale);
+
+      // Draw snake
+      ctx.fillStyle = snake.color;
+      snake.body.forEach(segment => {
+        ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
+      });
+    }
+
+    // Handle keypress for desktop controls (only left and right)
+    window.addEventListener("keydown", (e) => {
+      if (!gameStarted) return;
+
+      if (e.key === "ArrowLeft" && snake.direction.x !== 1) {
+        socket.emit("keyPress", "ArrowLeft");
+      } else if (e.key === "ArrowRight" && snake.direction.x !== -1) {
+        socket.emit("keyPress", "ArrowRight");
       }
     });
 
-    // Touch-Steuerung für Mobilgeräte (nur nach links oder rechts)
+    // Handle touch control for mobile (only left and right)
     let touchStartX = 0;
     let touchStartY = 0;
 
@@ -141,31 +157,35 @@
     function handleTouchMove(event) {
       const touch = event.touches[0];
       const diffX = touch.pageX - touchStartX;
+      const diffY = touch.pageY - touchStartY;
 
-      if (Math.abs(diffX) > 50) {  // Wenn genug Abstand gewischt wurde
-        if (diffX > 0) {
-          socket.emit("keyPress", "ArrowRight");  // nach rechts
-        } else {
-          socket.emit("keyPress", "ArrowLeft");  // nach links
+      // Only consider horizontal swipe (left or right)
+      if (Math.abs(diffX) > Math.abs(diffY)) {
+        if (diffX > 0 && snake.direction.x !== -1) {
+          socket.emit("keyPress", "ArrowRight");
+        } else if (diffX < 0 && snake.direction.x !== 1) {
+          socket.emit("keyPress", "ArrowLeft");
         }
-        touchStartX = touch.pageX;  // Rücksetzen des Startwerts
       }
+      touchStartX = touch.pageX;
+      touchStartY = touch.pageY;
     }
 
-    // Event-Listener für Touch-Events
     canvas.addEventListener("touchstart", handleTouchStart);
     canvas.addEventListener("touchmove", handleTouchMove);
 
-    // Mobile Button-Steuerung (nur links und rechts)
+    // Mobile button controls (only left and right)
     document.getElementById("left").addEventListener("click", () => {
-      if (gameStarted) socket.emit("keyPress", "ArrowLeft");
+      if (gameStarted && snake.direction.x !== 1) {
+        socket.emit("keyPress", "ArrowLeft");
+      }
     });
     document.getElementById("right").addEventListener("click", () => {
-      if (gameStarted) socket.emit("keyPress", "ArrowRight");
+      if (gameStarted && snake.direction.x !== -1) {
+        socket.emit("keyPress", "ArrowRight");
+      }
     });
 
-    // Spiel starten, nachdem der Countdown abgelaufen ist
-    startGame();
   </script>
 </body>
 </html>
