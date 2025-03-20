@@ -1,110 +1,149 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Snake Game</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
   <style>
-    body { margin: 0; padding: 0; }
-    canvas { background-color: #000; display: block; margin: 0 auto; }
-    #countdown {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 50px;
-      color: white;
-      font-weight: bold;
+    canvas {
+      border: 1px solid black;
+      display: block;
+      margin: 20px auto;
+    }
+    /* Optionale Buttons für mobile Steuerung */
+    .controls {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .button {
+      width: 50px;
+      height: 50px;
+      background-color: lightgray;
+      margin: 5px;
+      text-align: center;
+      line-height: 50px;
+      font-size: 20px;
+      cursor: pointer;
+      border-radius: 50%;
     }
   </style>
 </head>
 <body>
-  <div id="countdown">3</div>
   <canvas id="gameCanvas" width="400" height="400"></canvas>
 
-  <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+  <!-- Buttons für mobile Steuerung -->
+  <div class="controls">
+    <div class="button" id="up">↑</div>
+    <div class="button" id="left">←</div>
+    <div class="button" id="right">→</div>
+    <div class="button" id="down">↓</div>
+  </div>
+
   <script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const countdownElement = document.getElementById('countdown');
+    const socket = io("https://snake1-kgp4.onrender.com");  // Backend-URL
+
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
     const gridSize = 20;
-    let countdown = 3;
-    let player = null;
-    let players = {};
-    let food = { x: 10, y: 10 };
-    let socket;
+    const scale = 20;
 
-    // Startet den Countdown im Frontend
-    function startCountdown() {
-      const interval = setInterval(() => {
-        countdownElement.textContent = countdown;
-        countdown--;
+    let snake, food;
 
-        if (countdown < 0) {
-          clearInterval(interval);
-          countdownElement.style.display = "none";
-          connectToServer(); // Verbindung zum Server herstellen, wenn der Countdown vorbei ist
-        }
-      }, 1000);
-    }
+    socket.on("init", (data) => {
+      snake = data.snake;
+      food = data.food;
+      drawGame();
+    });
 
-    // Verbindet den Client mit dem Server, nachdem der Countdown abgelaufen ist
-    function connectToServer() {
-      socket = io("https://snake1-kgp4.onrender.com"); // Backend URL einfügen
+    socket.on("gameUpdate", (data) => {
+      snake = data.players[Object.keys(data.players)[0]];  // Hol dir den ersten Spieler
+      food = data.food;
+      drawGame();
+    });
 
-      socket.on("init", (data) => {
-        player = data.snake;
-        food = data.food;
-        renderGame();
-      });
+    socket.on("gameOver", (data) => {
+      alert(`${data.winner} wins!`);
+    });
 
-      socket.on("gameUpdate", (data) => {
-        players = data.players;
-        food = data.food;
-        renderGame();
-      });
+    socket.on("newPlayer", (data) => {
+      // Handle new player logic if necessary
+    });
 
-      socket.on("newPlayer", (data) => {
-        players[data.id] = data.snake;
-        renderGame();
-      });
-
-      socket.on("playerLeft", (data) => {
-        delete players[data.id];
-        renderGame();
-      });
-
-      // Steuerung: Tastendruck registrieren
-      document.addEventListener("keydown", (e) => {
-        if (e.key === "ArrowLeft") {
-          socket.emit("keyPress", "ArrowLeft");
-        }
-        if (e.key === "ArrowRight") {
-          socket.emit("keyPress", "ArrowRight");
-        }
-      });
-    }
-
-    // Rendern des Spiels
-    function renderGame() {
+    // Zeichnen des Spiels
+    function drawGame() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Essen rendern
+      // Zeichne Food
       ctx.fillStyle = "green";
-      ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
+      ctx.fillRect(food.x * gridSize, food.y * gridSize, scale, scale);
 
-      // Spieler rendern
-      for (const playerId in players) {
-        const p = players[playerId];
-        ctx.fillStyle = p.color;
-        p.body.forEach(([x, y]) => {
-          ctx.fillRect(x * gridSize, y * gridSize, gridSize, gridSize);
-        });
-      }
+      // Zeichne Snake
+      ctx.fillStyle = snake.color;  // Verwende die zufällige Farbe des Spielers
+      snake.body.forEach(segment => {
+        ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
+      });
     }
 
-    // Start des Countdowns
-    startCountdown();
+    // Tastenanschläge für Steuerung (Desktop)
+    window.addEventListener("keydown", (e) => {
+      socket.emit("keyPress", e.key);
+    });
+
+    // Touch-Steuerung für Mobilgeräte
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    // Funktion, um die Richtung basierend auf der Wischbewegung zu ändern
+    function handleTouchStart(event) {
+      const touch = event.touches[0];
+      touchStartX = touch.pageX;
+      touchStartY = touch.pageY;
+    }
+
+    function handleTouchMove(event) {
+      const touch = event.touches[0];
+      const diffX = touch.pageX - touchStartX;
+      const diffY = touch.pageY - touchStartY;
+
+      if (Math.abs(diffX) > Math.abs(diffY)) {
+        // Horizontal wischen
+        if (diffX > 0) {
+          socket.emit("keyPress", "ArrowRight");  // nach rechts
+        } else {
+          socket.emit("keyPress", "ArrowLeft");  // nach links
+        }
+      } else {
+        // Vertikal wischen
+        if (diffY > 0) {
+          socket.emit("keyPress", "ArrowDown");  // nach unten
+        } else {
+          socket.emit("keyPress", "ArrowUp");  // nach oben
+        }
+      }
+      touchStartX = touch.pageX;
+      touchStartY = touch.pageY;
+    }
+
+    // Event-Listener für Touch-Events
+    canvas.addEventListener("touchstart", handleTouchStart);
+    canvas.addEventListener("touchmove", handleTouchMove);
+
+    // Mobile Button-Steuerung (alternativ)
+    document.getElementById("up").addEventListener("click", () => {
+      socket.emit("keyPress", "ArrowUp");
+    });
+    document.getElementById("down").addEventListener("click", () => {
+      socket.emit("keyPress", "ArrowDown");
+    });
+    document.getElementById("left").addEventListener("click", () => {
+      socket.emit("keyPress", "ArrowLeft");
+    });
+    document.getElementById("right").addEventListener("click", () => {
+      socket.emit("keyPress", "ArrowRight");
+    });
   </script>
 </body>
 </html>
