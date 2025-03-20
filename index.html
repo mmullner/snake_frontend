@@ -1,148 +1,110 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multiplayer Snake</title>
-    <style>
-        body {
-            background-color: black;
-            color: white;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-        }
-        canvas {
-            border: 2px solid white;
-            display: block;
-            margin: auto;
-        }
-        #countdown {
-            display: none;
-            font-size: 80px;
-            font-weight: bold;
-            text-align: center;
-            position: absolute;
-            width: 100%;
-            top: 40%;
-            color: red;
-        }
-        #controls {
-            position: absolute;
-            bottom: 20px;
-            width: 100%;
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-        }
-        .control-btn {
-            background-color: gray;
-            color: white;
-            font-size: 24px;
-            padding: 15px 30px;
-            border: none;
-            cursor: pointer;
-            border-radius: 10px;
-        }
-        .control-btn:active {
-            background-color: darkgray;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snake Game</title>
+  <style>
+    body { margin: 0; padding: 0; }
+    canvas { background-color: #000; display: block; margin: 0 auto; }
+    #countdown {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 50px;
+      color: white;
+      font-weight: bold;
+    }
+  </style>
 </head>
 <body>
-    <h1>Multiplayer Snake Game</h1>
-    <canvas id="gameCanvas" width="600" height="600"></canvas>
-    <div id="countdown">3</div>
+  <div id="countdown">3</div>
+  <canvas id="gameCanvas" width="400" height="400"></canvas>
 
-    <!-- Mobile Steuerung -->
-    <div id="controls">
-        <button class="control-btn" onclick="sendDirection('left')">⬅️ Links</button>
-        <button class="control-btn" onclick="sendDirection('right')">➡️ Rechts</button>
-    </div>
+  <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const countdownElement = document.getElementById('countdown');
+    const gridSize = 20;
+    let countdown = 3;
+    let player = null;
+    let players = {};
+    let food = { x: 10, y: 10 };
+    let socket;
 
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script>
-        const socket = io("https://snake1-kgp4.onrender.com"); // Backend-URL anpassen
+    // Startet den Countdown im Frontend
+    function startCountdown() {
+      const interval = setInterval(() => {
+        countdownElement.textContent = countdown;
+        countdown--;
 
-        const canvas = document.getElementById("gameCanvas");
-        const ctx = canvas.getContext("2d");
-        const countdownElement = document.getElementById("countdown");
-
-        let gameActive = false;
-        let players = {};
-        let food = { x: 10, y: 10 };
-        const gridSize = 20;
-
-        // ⏳ Countdown im Frontend starten
-        function startCountdown(callback) {
-            let count = 3;
-            countdownElement.innerText = count;
-            countdownElement.style.display = "block";
-
-            const interval = setInterval(() => {
-                count--;
-                countdownElement.innerText = count;
-                if (count <= 0) {
-                    clearInterval(interval);
-                    countdownElement.style.display = "none";
-                    gameActive = true;
-                    if (callback) callback(); // Startet das Spiel nach dem Countdown
-                }
-            }, 1000);
+        if (countdown < 0) {
+          clearInterval(interval);
+          countdownElement.style.display = "none";
+          connectToServer(); // Verbindung zum Server herstellen, wenn der Countdown vorbei ist
         }
+      }, 1000);
+    }
 
-        // 🎮 Verbindung herstellen & Countdown starten
-        socket.on("connect", () => {
-            startCountdown(() => {
-                // Nachdem der Countdown vorbei ist, Player erstellen und Spiel starten
-                socket.emit("newPlayer"); // Spiel mit neuem Spieler starten
-            });
+    // Verbindet den Client mit dem Server, nachdem der Countdown abgelaufen ist
+    function connectToServer() {
+      socket = io("https://snake1-kgp4.onrender.com"); // Backend URL einfügen
+
+      socket.on("init", (data) => {
+        player = data.snake;
+        food = data.food;
+        renderGame();
+      });
+
+      socket.on("gameUpdate", (data) => {
+        players = data.players;
+        food = data.food;
+        renderGame();
+      });
+
+      socket.on("newPlayer", (data) => {
+        players[data.id] = data.snake;
+        renderGame();
+      });
+
+      socket.on("playerLeft", (data) => {
+        delete players[data.id];
+        renderGame();
+      });
+
+      // Steuerung: Tastendruck registrieren
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "ArrowLeft") {
+          socket.emit("keyPress", "ArrowLeft");
+        }
+        if (e.key === "ArrowRight") {
+          socket.emit("keyPress", "ArrowRight");
+        }
+      });
+    }
+
+    // Rendern des Spiels
+    function renderGame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Essen rendern
+      ctx.fillStyle = "green";
+      ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
+
+      // Spieler rendern
+      for (const playerId in players) {
+        const p = players[playerId];
+        ctx.fillStyle = p.color;
+        p.body.forEach(([x, y]) => {
+          ctx.fillRect(x * gridSize, y * gridSize, gridSize, gridSize);
         });
+      }
+    }
 
-        // 🏃‍♂️ Spiel-Update empfangen
-        socket.on("gameUpdate", (data) => {
-            players = data.players;
-            food = data.food;
-            if (gameActive) drawGame();
-        });
-
-        // 🎮 Spielfeld zeichnen
-        function drawGame() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            for (const id in players) {
-                const player = players[id];
-                ctx.fillStyle = player.color;
-
-                player.body.forEach(([x, y]) => {
-                    ctx.fillRect(x * gridSize, y * gridSize, gridSize, gridSize);
-                });
-            }
-
-            // 🍏 Essen zeichnen
-            ctx.fillStyle = "red";
-            ctx.fillRect(food.x * gridSize, food.y * gridSize, gridSize, gridSize);
-        }
-
-        // 🔄 Steuerung relativ zur aktuellen Richtung senden
-        function changeDirection(turn) {
-            if (!gameActive) return;
-
-            socket.emit("keyPress", turn); // "left" oder "right" senden
-        }
-
-        // ⌨️ Tastatursteuerung
-        window.addEventListener("keydown", (event) => {
-            if (event.key === "ArrowLeft") changeDirection("left");
-            if (event.key === "ArrowRight") changeDirection("right");
-        });
-
-        // 📱 Mobile Steuerung
-        function sendDirection(direction) {
-            changeDirection(direction);
-        }
-    </script>
+    // Start des Countdowns
+    startCountdown();
+  </script>
 </body>
 </html>
