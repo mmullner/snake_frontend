@@ -1,137 +1,187 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Snake Multiplayer</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
-  <style>
-    canvas {
-      border: 1px solid black;
-      display: block;
-      margin: 20px auto;
-    }
-    .controls {
-      display: flex;
-      justify-content: center;
-      margin-top: 10px;
-    }
-    .button {
-      width: 80px;
-      height: 50px;
-      background-color: lightgray;
-      margin: 5px;
-      text-align: center;
-      line-height: 50px;
-      font-size: 20px;
-      cursor: pointer;
-      border-radius: 10px;
-    }
-    #playerInfo {
-      text-align: center;
-      font-size: 18px;
-      margin-top: 10px;
-    }
-    #countdown {
-      font-size: 80px;
-      color: red;
-      text-align: center;
-      margin-top: 20px;
-      position: absolute;
-      top: 40%;
-      left: 50%;
-      transform: translateX(-50%);
-      display: none;
-    }
-  </style>
-</head>
-<body>
-  <canvas id="gameCanvas" width="400" height="400"></canvas>
-  <div id="playerInfo"></div>
-  <div id="countdown"></div>
+const express = require("express");
+const http = require("http");
+const socketIo = require("socket.io");
+const cors = require("cors");
 
-  <div class="controls" id="mobileControls" style="display: none;">
-    <div class="button" id="left">⟲ Left</div>
-    <div class="button" id="right">⟳ Right</div>
-  </div>
+const app = express();
+const server = http.createServer(app);
 
-  <script>
-    const socket = io("https://snake1-kgp4.onrender.com");
-    const canvas = document.getElementById("gameCanvas");
-    const ctx = canvas.getContext("2d");
-    const countdownElement = document.getElementById("countdown");
+const io = socketIo(server, {
+  cors: {
+    origin: "https://snake-frontend-x8cf.onrender.com",
+    methods: ["GET", "POST"],
+  }
+});
 
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    if (isMobile) document.getElementById("mobileControls").style.display = "flex";
+const port = process.env.PORT || 3000;
 
-    let players = {};
-    let food = {};
-    let playerId = null;
-    let isInCountdown = false; // Flag, das angibt, ob der Countdown läuft
+app.use(cors());
+app.use(express.static("public"));
 
-    // Spieler wird initialisiert
-    socket.on("init", (data) => {
-      playerId = socket.id;
-      players[playerId] = data.snake;
-      food = data.food;
-      drawGame();
+let players = {};
+let food = { x: 10, y: 10 };
+const gridSize = 20;
+const speed = 180;
+
+let gameStarted = false;
+
+// 🕒 **Globaler Countdown für neue Spieler**
+function startGlobalCountdown(socket) {
+  let countdown = 3;
+
+  const interval = setInterval(() => {
+    socket.emit("globalCountdown", countdown); // Countdown an den Client senden
+    countdown--;
+
+    if (countdown < 0) {
+      clearInterval(interval);
+      addPlayer(socket); // Spieler nach dem Countdown hinzufügen
+    }
+  }, 1000);
+}
+
+// 🏁 **Spieler dem Spiel hinzufügen**
+function addPlayer(socket) {
+  console.log(`✅ Spieler verbindet sich: ${socket.id}`);
+
+  const playerNumber = getNextPlayerNumber();
+  const startPos = getRandomFreePosition();
+
+  let snake = {
+    id: socket.id,
+    number: playerNumber,
+    name: `Spieler ${playerNumber}`,
+    direction: { x: 1, y: 0 },
+    body: [[startPos.x, startPos.y]],
+    score: 0,
+    color: `#${Math.floor(Math.random() * 16777215).toString(16)}`,
+  };
+
+  players[socket.id] = snake;
+
+  socket.emit("init", { snake, food });
+  io.emit("newPlayer", { id: socket.id, snake });
+
+  console.log("Spiel für neuen Spieler gestartet!");
+  if (!gameStarted) {
+    gameStarted = true;
+    moveSnakes();
+  }
+}
+
+// 🏃 **Schlangenbewegung**
+function moveSnakes() {
+  let occupiedPositions = new Set();
+
+  Object.values(players).forEach(player => {
+    player.body.forEach(segment => {
+      occupiedPositions.add(`${segment[0]},${segment[1]}`);
     });
+  });
 
-    // Spiel aktualisieren
-    socket.on("gameUpdate", (data) => {
-      players = data.players;
-      food = data.food;
-      drawGame();
-    });
+  for (const playerId in players) {
+    const player = players[playerId];
 
-    // Spieler hat das Spiel verlassen
-    socket.on("playerLeft", (data) => {
-      delete players[data.id];
-      drawGame();
-    });
+    const newHead = [
+      (player.body[0][0] + player.direction.x + gridSize) % gridSize,
+      (player.body[0][1] + player.direction.y + gridSize) % gridSize
+    ];
 
-    // Countdown anzeigen
-    socket.on("countdown", (countdown) => {
-      countdownElement.style.display = "block";
-      countdownElement.innerText = countdown;
-
-      // Countdown zurücksetzen und nach 3 Sekunden ausblenden
-      if (countdown === 0) {
-        setTimeout(() => {
-          countdownElement.style.display = "none";
-          isInCountdown = false; // Countdown ist vorbei, Spielfeld soll wieder angezeigt werden
-          drawGame(); // Nach dem Countdown das Spielfeld anzeigen
-        }, 1000); // Nach einer Sekunde das Spielfeld wieder anzeigen
-      } else {
-        isInCountdown = true; // Countdown läuft, Spielfeld wird nicht angezeigt
-      }
-    });
-
-    // Spiel zeichnen
-    function drawGame() {
-      if (isInCountdown) {
-        return; // Zeige nur den Countdown, wenn dieser aktiv ist
-      }
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "red";
-      ctx.fillRect(food.x * 20, food.y * 20, 20, 20);
-
-      for (let id in players) {
-        ctx.fillStyle = players[id].color;
-        players[id].body.forEach(segment => ctx.fillRect(segment[0] * 20, segment[1] * 20, 20, 20));
-      }
-
-      document.getElementById("playerInfo").innerText =
-        `Spieler: ${players[playerId]?.name} | Score: ${players[playerId]?.score}`;
+    if (player.body.some(segment => segment[0] === newHead[0] && segment[1] === newHead[1]) ||
+        occupiedPositions.has(`${newHead[0]},${newHead[1]}`)) {
+        respawnPlayer(playerId);
+        continue;
     }
 
-    // Tastatursteuerung
-    window.addEventListener("keydown", (e) => socket.emit("keyPress", e.key));
+    player.body.unshift(newHead);
+    occupiedPositions.add(`${newHead[0]},${newHead[1]}`);
 
-    // Steuerung für mobile Geräte
-    document.getElementById("left").addEventListener("click", () => socket.emit("keyPress", "ArrowLeft"));
-    document.getElementById("right").addEventListener("click", () => socket.emit("keyPress", "ArrowRight"));
-  </script>
-</body>
-</html>
+    if (newHead[0] === food.x && newHead[1] === food.y) {
+      player.score += 1;
+      food = getRandomFreePosition();
+    } else {
+      player.body.pop();
+    }
+  }
+
+  io.emit("gameUpdate", { players, food });
+  setTimeout(moveSnakes, speed);
+}
+
+// 🔄 **Spieler respawnen**
+function respawnPlayer(playerId) {
+  const player = players[playerId];
+  if (!player) return;
+
+  const newStartPos = getRandomFreePosition();
+  players[playerId].body = [[newStartPos.x, newStartPos.y]];
+  players[playerId].score = 0;
+  players[playerId].direction = { x: 1, y: 0 };
+
+  io.emit("gameUpdate", { players, food });
+}
+
+// 🔢 **Spielernummer vergeben**
+function getNextPlayerNumber() {
+  let num = 1;
+  while (Object.values(players).some(p => p.number === num)) {
+    num++;
+  }
+  return num;
+}
+
+// 📍 **Zufällige freie Position auf dem Spielfeld**
+function getRandomFreePosition() {
+  let position;
+  let occupiedPositions = new Set();
+
+  Object.values(players).forEach(player => {
+    player.body.forEach(segment => {
+      occupiedPositions.add(`${segment[0]},${segment[1]}`);
+    });
+  });
+
+  do {
+    position = [Math.floor(Math.random() * gridSize), Math.floor(Math.random() * gridSize)];
+  } while (occupiedPositions.has(`${position[0]},${position[1]}`));
+
+  return { x: position[0], y: position[1] };
+}
+
+// 🎮 **Spieler-Verbindung**
+io.on("connection", (socket) => {
+  console.log(`🔄 Spieler verbindet sich: ${socket.id}`);
+
+  // Startet den globalen Countdown für den Spieler
+  startGlobalCountdown(socket);
+
+  socket.on("keyPress", (key) => {
+    const player = players[socket.id];
+    if (!player) return;
+
+    if (key === "ArrowLeft") {
+      const temp = player.direction.x;
+      player.direction.x = player.direction.y;
+      player.direction.y = -temp;
+    }
+    if (key === "ArrowRight") {
+      const temp = player.direction.x;
+      player.direction.x = -player.direction.y;
+      player.direction.y = temp;
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log(`❌ Spieler ${socket.id} hat das Spiel verlassen`);
+    delete players[socket.id];
+    io.emit("playerLeft", { id: socket.id });
+
+    if (Object.keys(players).length === 0) {
+      gameStarted = false;
+    }
+  });
+});
+
+server.listen(port, () => {
+  console.log(`🚀 Server läuft auf http://localhost:${port}`);
+});
