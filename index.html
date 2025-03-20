@@ -35,10 +35,8 @@
 
   <!-- Buttons für mobile Steuerung -->
   <div class="controls">
-    <div class="button" id="up">↑</div>
     <div class="button" id="left">←</div>
     <div class="button" id="right">→</div>
-    <div class="button" id="down">↓</div>
   </div>
 
   <script>
@@ -50,7 +48,55 @@
     const gridSize = 20;
     const scale = 20;
 
-    let snake, food;
+    let snake, food, countdown, gameStarted;
+
+    // Funktion, um das Spiel zu starten
+    function startGame() {
+      gameStarted = false;
+      countdown = 3;  // Countdown auf 3 Sekunden setzen
+      socket.emit("startGame");  // Signal an Backend, dass der Countdown startet
+      setInterval(updateCountdown, 1000);  // Countdown jede Sekunde aktualisieren
+    }
+
+    // Countdown aktualisieren
+    function updateCountdown() {
+      if (countdown > 0) {
+        countdown--;
+      } else {
+        gameStarted = true;  // Spiel starten
+        socket.emit("gameStart");  // Signal an Backend, dass das Spiel beginnt
+        drawGame();  // Zeichne das Spiel
+      }
+    }
+
+    // Zeichne den Countdown
+    function drawCountdown() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);  // Bildschirm löschen
+      ctx.fillStyle = "black";
+      ctx.font = "120px Arial";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(countdown, canvas.width / 2, canvas.height / 2);
+    }
+
+    // Zeichnen des Spiels
+    function drawGame() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);  // Bildschirm löschen
+
+      if (gameStarted) {
+        // Zeichne Food
+        ctx.fillStyle = "green";
+        ctx.fillRect(food.x * gridSize, food.y * gridSize, scale, scale);
+
+        // Zeichne Snake
+        ctx.fillStyle = snake.color;  // Verwende die zufällige Farbe des Spielers
+        snake.body.forEach(segment => {
+          ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
+        });
+      } else {
+        drawCountdown();  // Zeige Countdown, wenn das Spiel noch nicht gestartet wurde
+      }
+    }
 
     socket.on("init", (data) => {
       snake = data.snake;
@@ -72,31 +118,20 @@
       // Handle new player logic if necessary
     });
 
-    // Zeichnen des Spiels
-    function drawGame() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Zeichne Food
-      ctx.fillStyle = "green";
-      ctx.fillRect(food.x * gridSize, food.y * gridSize, scale, scale);
-
-      // Zeichne Snake
-      ctx.fillStyle = snake.color;  // Verwende die zufällige Farbe des Spielers
-      snake.body.forEach(segment => {
-        ctx.fillRect(segment[0] * gridSize, segment[1] * gridSize, scale, scale);
-      });
-    }
-
-    // Tastenanschläge für Steuerung (Desktop)
+    // Tastenanschläge für Steuerung (nur rechts und links)
     window.addEventListener("keydown", (e) => {
-      socket.emit("keyPress", e.key);
+      if (gameStarted) {
+        // Nur nach links oder rechts abbiegen
+        if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+          socket.emit("keyPress", e.key);
+        }
+      }
     });
 
-    // Touch-Steuerung für Mobilgeräte
+    // Touch-Steuerung für Mobilgeräte (nur nach links oder rechts)
     let touchStartX = 0;
     let touchStartY = 0;
 
-    // Funktion, um die Richtung basierend auf der Wischbewegung zu ändern
     function handleTouchStart(event) {
       const touch = event.touches[0];
       touchStartX = touch.pageX;
@@ -106,44 +141,31 @@
     function handleTouchMove(event) {
       const touch = event.touches[0];
       const diffX = touch.pageX - touchStartX;
-      const diffY = touch.pageY - touchStartY;
 
-      if (Math.abs(diffX) > Math.abs(diffY)) {
-        // Horizontal wischen
+      if (Math.abs(diffX) > 50) {  // Wenn genug Abstand gewischt wurde
         if (diffX > 0) {
           socket.emit("keyPress", "ArrowRight");  // nach rechts
         } else {
           socket.emit("keyPress", "ArrowLeft");  // nach links
         }
-      } else {
-        // Vertikal wischen
-        if (diffY > 0) {
-          socket.emit("keyPress", "ArrowDown");  // nach unten
-        } else {
-          socket.emit("keyPress", "ArrowUp");  // nach oben
-        }
+        touchStartX = touch.pageX;  // Rücksetzen des Startwerts
       }
-      touchStartX = touch.pageX;
-      touchStartY = touch.pageY;
     }
 
     // Event-Listener für Touch-Events
     canvas.addEventListener("touchstart", handleTouchStart);
     canvas.addEventListener("touchmove", handleTouchMove);
 
-    // Mobile Button-Steuerung (alternativ)
-    document.getElementById("up").addEventListener("click", () => {
-      socket.emit("keyPress", "ArrowUp");
-    });
-    document.getElementById("down").addEventListener("click", () => {
-      socket.emit("keyPress", "ArrowDown");
-    });
+    // Mobile Button-Steuerung (nur links und rechts)
     document.getElementById("left").addEventListener("click", () => {
-      socket.emit("keyPress", "ArrowLeft");
+      if (gameStarted) socket.emit("keyPress", "ArrowLeft");
     });
     document.getElementById("right").addEventListener("click", () => {
-      socket.emit("keyPress", "ArrowRight");
+      if (gameStarted) socket.emit("keyPress", "ArrowRight");
     });
+
+    // Spiel starten, nachdem der Countdown abgelaufen ist
+    startGame();
   </script>
 </body>
 </html>
